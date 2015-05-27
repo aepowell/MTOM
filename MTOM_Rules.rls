@@ -1,5 +1,5 @@
 # RiverWare_Ruleset 6.6.3 Patch
-# Created 10:41 May 27, 2015
+# Created 10:46 May 27, 2015
 # 
 RULESET
 AGENDA_ORDER ASCENDING;
@@ -474,13 +474,16 @@ BEGIN
    ELSE
       0.00000000 "acre-ft"
    ENDIF) DO
-          DESCRIPTION          "When the NV unbanked to CA logic needs to be improved, the next two<br>with statements is where that should happen, currently the values for<br>unbanked to CA and NV will be 0 af";
-      WITH_STATEMENT (NUMERIC nvUnbankedCA = 0.00000000 "acre-ft") DO
-            WITH_STATEMENT (NUMERIC nvUnbankedAZ = 0.00000000 "acre-ft") DO
+          DESCRIPTION          "Nevada is permitted to recover up to 40,000 AF from AZ and 30,000 CA, added based on an <br>email, April 27,2015 subject &quot;Re: MTOM Action Items&quot; from Shana Thigi to Tony Powell";
+      WITH_STATEMENT (NUMERIC annNVRecoverableAZ = "Min"( 40000.00000000 "acre-ft", $ "ICS Credits.CumulativeNVBankedinAZ" [@"24:00:00 December Max DayOfMonth, Previous Year"] )) DO
+            WITH_STATEMENT (NUMERIC annNVRecoverableCA = "Min"( 30000.00000000 "acre-ft", $ "ICS Credits.CumulativeNVBankedinCA" [@"24:00:00 December Max DayOfMonth, Previous Year"] )) DO
+          DESCRIPTION          "When the NV unbanked to CA logic needs to be improved, the next two<br>with statements is where that should happen, currently the values for<br>unbanked to CA and AZ will be 0 af.  When logic is generated it needs to be <br>limited to the Recoverable water available to NV. ";
+      WITH_STATEMENT (NUMERIC nvUnbankedCA = "Min"( 0.00000000 "acre-ft", annNVRecoverableCA )) DO
+            WITH_STATEMENT (NUMERIC nvUnbankedAZ = "Min"( 0.00000000 "acre-ft", annNVRecoverableAZ )) DO
           DESCRIPTION          "Annual Nevada Water not Used";
       $ "ICS Credits.AnnualNevadaUnused" ["Dec31ofYear"( @"t" )] := unusedNV;
 
-            $ "ICS Credits.CumulativeNVBankedinCA" ["Dec31ofYear"( @"t" )] := $ "ICS Credits.CumulativeNVBankedinCA" [@"24:00:00 December Max DayOfMonth, Previous Year"] + nvBankedCA - nvUnbankedCA;
+            $ "ICS Credits.CumulativeNVBankedinCA" ["Dec31ofYear"( @"t" )] := $ "ICS Credits.CumulativeNVBankedinCA" [@"24:00:00 December Max DayOfMonth, Previous Year"] + nvBankedCA * 0.66666600 - nvUnbankedCA;
 
             $ "ICS Credits.CumulativeNVBankedinAZ" ["Dec31ofYear"( @"t" )] := $ "ICS Credits.CumulativeNVBankedinAZ" [@"24:00:00 December Max DayOfMonth, Previous Year"] + nvBankedAZ - nvUnbankedAZ;
 
@@ -488,13 +491,17 @@ BEGIN
 
             $ "ICS Credits.AnnualNVBankedinAZ" ["Dec31ofYear"( @"t" )] := nvBankedAZ;
 
-            $ "ICS Credits.AnnualNVRecoverableCA" ["Dec31ofYear"( @"t" )] := nvBankedCA * 0.66666600;
+            $ "ICS Credits.AnnualNVRecoverableCA" ["Dec31ofYear"( @"t" )] := annNVRecoverableCA;
 
-            $ "ICS Credits.AnnualNVRecoverableAZ" ["Dec31ofYear"( @"t" )] := nvBankedAZ;
+            $ "ICS Credits.AnnualNVRecoverableAZ" ["Dec31ofYear"( @"t" )] := annNVRecoverableAZ;
 
             $ "ICS Credits.AnnualNVUnBankedFromCA" ["Dec31ofYear"( @"t" )] := nvUnbankedCA;
 
             $ "ICS Credits.AnnualNVUnbankedFromAZ" ["Dec31ofYear"( @"t" )] := nvUnbankedAZ;
+
+      END_WITH_STATEMENT;
+
+      END_WITH_STATEMENT;
 
       END_WITH_STATEMENT;
 
@@ -557,14 +564,17 @@ BEGIN
           DESCRIPTION          "Tributary ICS NV";
       $ "ICS Credits.TributaryICS_NV" ["Dec31ofYear"( @"t" )] := ( GET @INDEX 13.00000000 FROM nvICSValues );
 
-          INACTIVE    DESCRIPTION          "Adjust the Diversion and Depletion Request from Lake Mead that is appropriate<br>for the deliveries of ICS to Nevada that match the set Logic above. ";
+            IF_STATEMENT (NaNToZero ( $ "Shortage.Shortage Flag" ["Dec31ofYear"( @"t" )] ) > 0.00000000) THEN
+          DESCRIPTION          "Adjust the Diversion and Depletion Request from Lake Mead that is appropriate<br>for the deliveries of ICS to Nevada that match the set Logic above only in a <br>Shortage condition. ";
       FOREACH (DATETIME date IN "DateMax"( @"24:00:00 January Max DayOfMonth, Current Year", @"t" ) TO @"24:00:00 December Max DayOfMonth, Current Year") DO
             FOREACH (SLOT slot IN { $ "PumpingFromLakeMead:SNWP.Diversion Requested" , $ "PumpingFromLakeMead:SNWP.Depletion Requested" }) DO
-            slot [date] := $ "PumpingFromLakeMead:SNWP.Diversion Requested" [date] + ( ( GET @INDEX 8.00000000 FROM nvICSValues ) - ( GET @INDEX 9.00000000 FROM nvICSValues ) ) * $ "Shortage.MonthlyPercents" ["GetMonth"( date ) - 1.00000000, "Average"] / 1.00000000 "month";
+            slot [date] := "VolumeToFlow"( ( GET @INDEX 14.00000000 FROM nvICSValues ) * $ "Shortage.MonthlyPercents" ["GetMonth"( date ) - 1.00000000, "Average"], date );
 
       ENDFOREACH;
 
       ENDFOREACH;
+
+      END_IF_STATEMENT;
 
       END_WITH_STATEMENT;
 
@@ -600,7 +610,7 @@ BEGIN
 
           DESCRIPTION          "Adjust the CAP Diversion Request to get more water out of Lake Mead <br>that matches the values that were just set for ICS. ";
       FOREACH (DATETIME date IN "DateMax"( @"24:00:00 January Max DayOfMonth, Current Year", @"t" ) TO @"24:00:00 December Max DayOfMonth, Current Year") DO
-            $ "CAPDiversion.Total Diversion Requested" [date] := $ "CAPDiversion.Total Diversion Requested" [date] + "VolumeToFlow"( ( ( GET @INDEX 7.00000000 FROM azICSValues ) - ( GET @INDEX 8.00000000 FROM azICSValues ) ) COMMENTED_BY "Deliveries minus creations" * $ "Shortage.MonthlyPercents" ["GetMonth"( date ) - 1.00000000, "Average"], date );
+            $ "CAPDiversion.Total Diversion Requested" [date] := $ "CAPDiversion.Total Diversion Requested" [date] + "VolumeToFlow"( ( ( GET @INDEX 7.00000000 FROM azICSValues ) - ( GET @INDEX 8.00000000 FROM azICSValues ) ) COMMENTED_BY "Deliveries " * $ "Shortage.MonthlyPercents" ["GetMonth"( date ) - 1.00000000, "Average"], date );
 
       ENDFOREACH;
 
@@ -614,6 +624,33 @@ BEGIN
   DESCRIPTION    "";
   ACTIVE         TRUE;
   BEGIN
+
+    RULE                 "Set MWDLBDV Difference";
+    DESCRIPTION          "This Rule assigns the MWD Lower Basin Demand Variability Difference for use by the ICS logic.  This values is the amount of California Apportionment that California can credit store as Extraordinary Conservation ICS.  This rule fires after the Lower Basin Demand Variability logic so that the value is calculated after the LBDV logic to accommodate any diversion request changes that may result from that Logic.  TP 4/30/2015";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT ( @"t" == @"Start Timestep" OR @"t" == @"24:00:00 January Max DayOfMonth, Current Year" ) AND "GetRunCycleIndex"(  ) == 3.00000000 AND NOT "HasRuleFiredSuccessfully"( "This Rule" ) AND NaNToZero ( $ "Surplus.Surplus Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000 AND NaNToZero ( $ "Surplus.Quantified Surplus Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000 AND NaNToZero ( $ "Shortage.Shortage Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000 AND NaNToZero ( $ "Surplus.Domestic Surplus Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000 AND NaNToZero ( $ "Surplus.Flood Control Surplus Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000;
+    BEGIN
+
+      $ "LowerBasinDemandVariability.MWDLBDVDifference" ["Dec31ofYear"( @"t" )] := WITH NUMERIC calAdjApportionment = $ "AnnualWaterUse.California_Apportionment" ["Dec31ofYear"( @"t" )] DO
+      WITH NUMERIC nonMWDDemandsAfterLBDV = FOR ( DATETIME date IN "DateMax"( @"24:00:00 January Max DayOfMonth, Current Year", @"24:00:00 January Max DayOfMonth, Current Year" ) TO @"24:00:00 December Max DayOfMonth, Current Year" ) STAT_SUM
+         FOR ( OBJECT diversionSite IN "ListSubbasin"( "California nonMWD WaterUsers" ) ) STAT_SUM
+            IF ( diversionSite == % "PaloVerde" )
+            THEN
+               "FlowToVolume"( diversionSite & "Total Diversion Requested" [date], date )
+            ELSE
+               "FlowToVolume"( diversionSite & "Diversion Requested" [date], date )
+            ENDIF
+         ENDFOR
+      ENDFOR DO
+         WITH NUMERIC mwdScheduleAfterLBDV = FOR ( DATETIME date IN "GetDates"( "OffsetDate"( "Dec31ofYear"( @"t" ), "Units NONE"( 31.00000000 "day" - "GetDayOfYear"( "Dec31ofYear"( @"t" ) ) ), "1 days" ), "Dec31ofYear"( @"t" ), "1 Months" ) ) STAT_SUM
+            "FlowToVolume"( $ "MWDDiversion:MWD.Diversion Requested" [date], date )
+         ENDFOR DO
+            - ( calAdjApportionment - nonMWDDemandsAfterLBDV - mwdScheduleAfterLBDV )
+         ENDWITH
+      ENDWITH
+   ENDWITH;
+
+    END;
 
     RULE                 "Reset Monthly Forecast SNWP LC Demand Variability";
     DESCRIPTION          "";
@@ -652,7 +689,7 @@ BEGIN
       FOREACH (DATETIME date IN "GetFirstDate"( @"t" ) TO @"24:00:00 December Max DayOfMonth, Current Year") DO
             $ "CAPDiversion.Total Diversion Requested" [date] := $ "CAPDiversion.Total Diversion Requested" [date] * "CAPDemandVariabilityFactor"( date );
 
-          INACTIVE      $ "LowerBasinDemandVariability.AbvHooverTriggerSet" ["Dec31ofYear"( date )] := IF ( "CAPDemandVariabilityFactor"( date ) == 1.00000000 )
+          INACTIVE      $ "LowerBasinDemandVariability.AbvHooverTriggerSet" [""( date )] := IF ( "CAPDemandVariabilityFactor"( date ) == 1.00000000 )
    THEN
       0.00000000
    ELSE
@@ -673,6 +710,34 @@ BEGIN
     ACTIVE               TRUE;
     RULE_EXEC_CONSTRAINT ( @"t" == @"Start Timestep" OR @"t" == @"24:00:00 January Max DayOfMonth, Current Year" ) AND "GetRunCycleIndex"(  ) == 3.00000000 AND NOT "HasRuleFiredSuccessfully"( "This Rule" ) AND NaNToZero ( $ "Surplus.Surplus Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000 AND NaNToZero ( $ "Surplus.Quantified Surplus Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000 AND NaNToZero ( $ "Shortage.Shortage Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000 AND NaNToZero ( $ "Surplus.Domestic Surplus Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000 AND NaNToZero ( $ "Surplus.Flood Control Surplus Flag" ["Dec31ofYear"( @"t" )] ) == 0.00000000;
     BEGIN
+
+      $ "LowerBasinDemandVariability.MWDLBDVDifference" ["Dec31ofYear"( @"t" )] := WITH NUMERIC yearBaseMWDSchedVol = IF ( TRUE )
+   THEN
+      FOR ( DATETIME date IN "GetDates"( "OffsetDate"( "Dec31ofYear"( @"t" ), "Units NONE"( 31.00000000 "day" - "GetDayOfYear"( "Dec31ofYear"( @"t" ) ) ), "1 days" ), "Dec31ofYear"( @"t" ), "1 Months" ) ) STAT_SUM
+         "FlowToVolume"( $ "MWDDiversion:MWD.Diversion Requested" [date], date )
+      ENDFOR
+   ELSE
+      "FlowToVolume"( "SumSlot"( $ "MWDDiversion:MWD.Diversion Requested", "OffsetDate"( "Dec31ofYear"( @"t" ), - 11.00000000, "1 Months" ), "Dec31ofYear"( @"t" ) ), "Dec31ofYear"( @"t" ) )
+   ENDIF DO
+      IF ( "IsMRM"(  ) AND NOT "IsSurplusOrShortage"(  ) )
+      THEN
+         IF ( ( $ "LowerBasinDemandVariability.PowellUnregulatedInflowTrigger" ["Dec31ofYear"( @"t" )] > $ "LowerBasinDemandVariability.LBDemandVariabilityTriggerThreshholds" [0.00000000, "PowellUnregInflow75"] ) )
+         THEN
+            700000.00000000 "acre-ft" - yearBaseMWDSchedVol
+         ELSE
+            IF ( ( $ "LowerBasinDemandVariability.PowellUnregulatedInflowTrigger" ["Dec31ofYear"( @"t" )] < $ "LowerBasinDemandVariability.LBDemandVariabilityTriggerThreshholds" [0.00000000, "PowellUnregInflow25"] ) )
+            THEN
+               WITH NUMERIC availTotalCAICSCredWater = $ "ICS Credits.TotalICS_CA" ["OffsetDate"( "Dec31ofYear"( @"t" ), - 12.00000000, "1 Months" )] + yearBaseMWDSchedVol DO
+                  "Min"( 1100000.00000000 "acre-ft", availTotalCAICSCredWater ) - yearBaseMWDSchedVol
+               ENDWITH
+            ELSE
+               0.00000000 "acre-ft"
+            ENDIF
+         ENDIF
+      ELSE
+         0.00000000 "acre-ft"
+      ENDIF
+   ENDWITH;
 
       FOREACH (DATETIME date IN "GetFirstDate"( @"t" ) TO @"24:00:00 December Max DayOfMonth, Current Year") DO
             IF_STATEMENT (NOT date IN "GetDates"( "GetFirstDate"( @"Start Timestep" ), "Dec31ofYear"( @"Start Timestep" ), "1 Months" )) THEN
@@ -719,27 +784,6 @@ BEGIN
       END_IF_STATEMENT;
 
       ENDFOREACH;
-
-      $ "LowerBasinDemandVariability.MWDLBDVDifference" ["Dec31ofYear"( @"t" )] := WITH NUMERIC yearBaseMWDSchedVol = "FlowToVolume"( "SumSlot"( $ "MWDDiversion:MWD.Diversion Requested", "OffsetDate"( "Dec31ofYear"( @"t" ), - 11.00000000, "1 Months" ), "Dec31ofYear"( @"t" ) ), "Dec31ofYear"( @"t" ) ) DO
-      IF ( "IsMRM"(  ) AND NOT "IsSurplusOrShortage"(  ) )
-      THEN
-         IF ( ( $ "LowerBasinDemandVariability.PowellUnregulatedInflowTrigger" ["Dec31ofYear"( @"t" )] > $ "LowerBasinDemandVariability.LBDemandVariabilityTriggerThreshholds" [0.00000000, "PowellUnregInflow75"] ) )
-         THEN
-            700000.00000000 "acre-ft" - yearBaseMWDSchedVol
-         ELSE
-            IF ( ( $ "LowerBasinDemandVariability.PowellUnregulatedInflowTrigger" ["Dec31ofYear"( @"t" )] < $ "LowerBasinDemandVariability.LBDemandVariabilityTriggerThreshholds" [0.00000000, "PowellUnregInflow25"] ) )
-            THEN
-               WITH NUMERIC availTotalCAICSCredWater = $ "ICS Credits.TotalICS_CA" ["OffsetDate"( "Dec31ofYear"( @"t" ), - 12.00000000, "1 Months" )] + yearBaseMWDSchedVol DO
-                  "Min"( 1100000.00000000 "acre-ft", availTotalCAICSCredWater ) - yearBaseMWDSchedVol
-               ENDWITH
-            ELSE
-               0.00000000 "acre-ft"
-            ENDIF
-         ENDIF
-      ELSE
-         0.00000000 "acre-ft"
-      ENDIF
-   ENDWITH;
 
     END;
 
@@ -2745,334 +2789,6 @@ BEGIN
 
   END;
 
-  POLICY_GROUP   "Flaming Gorge_OLD";
-  DESCRIPTION    "";
-  ACTIVE         FALSE;
-  BEGIN
-
-    RULE                 "RIP Adjusted Release Request";
-    DESCRIPTION          "";
-    ACTIVE               FALSE;
-    RULE_EXEC_CONSTRAINT NOT IsNaN $ "FlamingGorgeData.RipAdjustedReleaseRequest" [];
-    BEGIN
-
-      $ "FlamingGorge.Outflow" [] := $ "FlamingGorgeData.RipAdjustedReleaseRequest" [];
-
-    END;
-
-    RULE                 "Shift Water for Power Generation";
-    DESCRIPTION          "";
-    ACTIVE               FALSE;
-    RULE_EXEC_CONSTRAINT TRUE;
-    BEGIN
-
-    END;
-
-    RULE                 "Spill for PE Control";
-    DESCRIPTION          "";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-      IF_STATEMENT ($ "FlamingGorge.Pool Elevation" [] > $ "FlamingGorgeData.MaxPE" []) THEN
-            $ "FlamingGorgeData.ManualSpill" [] := $ "FlamingGorgeData.ManualSpill" [] + "VolumeToFlow"( "ElevationToStorage"( % "FlamingGorge", $ "FlamingGorge.Pool Elevation" [] ) - "ElevationToStorage"( % "FlamingGorge", $ "FlamingGorgeData.MaxPE" [] ), @"t" );
-
-            $ "FlamingGorge.Outflow" [] := $ "FlamingGorge.Outflow" [] + "VolumeToFlow"( "ElevationToStorage"( % "FlamingGorge", $ "FlamingGorge.Pool Elevation" [] ) - "ElevationToStorage"( % "FlamingGorge", $ "FlamingGorgeData.MaxPE" [] ), @"t" );
-
-            $ "FlamingGorge.Bypass" [] := "Min"( $ "FlamingGorge.Bypass" [] + "VolumeToFlow"( "ElevationToStorage"( % "FlamingGorge", $ "FlamingGorge.Pool Elevation" [] ) - "ElevationToStorage"( % "FlamingGorge", $ "FlamingGorgeData.MaxPE" [] ), @"t" ), ( $ "FlamingGorgeData.BypassCharacteristics" [0.00000000, "Bypass Capacity"] - $ "FlamingGorgeData.PowerPlantCapacity" [] ) COMMENTED_BY "The actual bypass capacity, not counting the amount that can go through the power plant" );
-
-      END_IF_STATEMENT;
-
-    END;
-
-    RULE                 "Min Flow in Extremely Dry Years with Low Storage";
-    DESCRIPTION          "";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "MonthIs"( { "January" , "February" , "March" , "April" , "August" , "September" , "October" , "November" , "December" } ) AND "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-      IF_STATEMENT ($ "FlamingGorge.Pool Elevation" [] < $ "FlamingGorgeData.MinReleaseTrigger" []) THEN
-            $ "FlamingGorge.Outflow" [] := $ "FlamingGorgeData.AbsoluteMinRelease" [];
-
-            $ "FlamingGorgeData.LowReleaseFlag" [] := 1.00000000;
-
-      END_IF_STATEMENT;
-
-    END;
-
-    RULE                 "Recalculate June July Baseflow";
-    DESCRIPTION          "";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "MonthIs"( { "June" , "July" } ) AND "GetRunCycleIndex"(  ) == 2.00000000 AND @"t" != @"Start Timestep";
-    BEGIN
-
-      $ "FlamingGorge.Outflow" [] := IF ( $ "FlamingGorgeData.DailyFGOutflow" ["GetStartDayOfMonth"(  )] == $ "FlamingGorgeData.DailyFGOutflow" ["GetEndDayOfMonth"(  )] )
-   THEN
-      "Max"( "GetFGBaseFlowMagnitude"(  ), ( "VolumeToFlow"( "PrevStorage"( % "FlamingGorge" ), @"t" ) + $ "FlamingGorge.Inflow" [] - "VolumeToFlow"( "ElevationToStorage"( % "FlamingGorge", 6039.50000000 "ft" ), @"t" ) ) COMMENTED_BY "Check for Spill -HG 10/5/12" )
-   ENDIF;
-
-    END;
-
-    RULE                 "Spring Flow Operations ";
-    DESCRIPTION          "";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "MonthIs"( { "May" , "June" , "July" } ) AND "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-      IF_STATEMENT (@"t" == @"Start Timestep" AND ( "GetMonthAsString"( @"Start Timestep" ) == "June" OR "GetMonthAsString"( @"Start Timestep" ) == "July" )) THEN
-            IF_STATEMENT ("GetMonthAsString"( @"t" ) == "June") THEN
-          DESCRIPTION          "Adjust calculated June releases to account for any difference between actual and calculated May releases. -HG 10/5/12";
-      $ "FlamingGorge.Outflow" [] := WITH NUMERIC adjustment = $ "FlamingGorgeData.MonthlyFGOutflow" [@"24:00:00 May Max DayOfMonth, Current Year"] - $ "FlamingGorge.Outflow" [@"24:00:00 May Max DayOfMonth, Current Year"] DO
-      "Max"( $ "FlamingGorgeData.MonthlyFGOutflow" [] + adjustment, 0.00000000 "cfs" )
-   ENDWITH;
-
-      ELSE
-          DESCRIPTION          "Adjust calculated July releases to account for any difference between actual and calculated May and June releases. -HG 10/5/12";
-      $ "FlamingGorge.Outflow" [] := WITH NUMERIC adjustment = ( $ "FlamingGorgeData.MonthlyFGOutflow" [@"24:00:00 May Max DayOfMonth, Current Year"] + $ "FlamingGorgeData.MonthlyFGOutflow" [@"24:00:00 June Max DayOfMonth, Current Year"] ) - ( $ "FlamingGorge.Outflow" [@"24:00:00 May Max DayOfMonth, Current Year"] + $ "FlamingGorge.Outflow" [@"24:00:00 June Max DayOfMonth, Current Year"] ) DO
-      "Max"( $ "FlamingGorgeData.MonthlyFGOutflow" [] + adjustment, 0.00000000 "cfs" )
-   ENDWITH;
-
-      END_IF_STATEMENT;
-
-      ELSE
-            $ "FlamingGorge.Outflow" [] := $ "FlamingGorgeData.MonthlyFGOutflow" [];
-
-      END_IF_STATEMENT;
-
-    END;
-
-    RULE                 "Sum Daily Release To Monthly, Check For Spills";
-    DESCRIPTION          "";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "MonthIs"( { "May" , "June" , "July" } ) AND "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-      $ "FlamingGorgeData.MonthlyFGOutflow" [] := WITH NUMERIC release = FOR ( DATETIME date IN "GetDates"( "GetStartDayOfMonth"(  ), "GetEndDayOfMonth"(  ), "1 days" ) ) STAT_AVE
-      $ "FlamingGorgeData.DailyFGOutflow" [date]
-   ENDFOR DO
-      WITH NUMERIC spillRelease = "VolumeToFlow"( "PrevStorage"( % "FlamingGorge" ), @"t" ) + $ "FlamingGorge.Inflow" [] - "VolumeToFlow"( "ElevationToStorage"( % "FlamingGorge", 6039.50000000 "ft" ), @"t" ) DO
-         "Max"( release, spillRelease ) COMMENTED_BY "this is temporary until a generic checResPhysical Constraints function can be built. - sc 01/28/11"
-      ENDWITH
-   ENDWITH;
-
-    DESCRIPTION          "When the start timestep is June or July, sum the <br>calculated daily releases before the start timestep. -HG 10/5/12";
-      IF_STATEMENT (@"t" == @"Start Timestep" AND ( "GetMonthAsString"( @"Start Timestep" ) == "June" OR "GetMonthAsString"( @"Start Timestep" ) == "July" )) THEN
-            $ "FlamingGorgeData.MonthlyFGOutflow" [@"24:00:00 May Max DayOfMonth, Current Year"] := FOR ( DATETIME date IN "GetDates"( @"24:00:00 May Min DayOfMonth, Current Year", @"24:00:00 May Max DayOfMonth, Current Year", "1 days" ) ) STAT_AVE
-      $ "FlamingGorgeData.DailyFGOutflow" [date]
-   ENDFOR;
-
-            IF_STATEMENT ("GetMonthAsString"( @"Start Timestep" ) == "July") THEN
-            $ "FlamingGorgeData.MonthlyFGOutflow" [@"24:00:00 June Max DayOfMonth, Current Year"] := FOR ( DATETIME date IN "GetDates"( @"24:00:00 June Min DayOfMonth, Current Year", @"24:00:00 June Max DayOfMonth, Current Year", "1 days" ) ) STAT_AVE
-      $ "FlamingGorgeData.DailyFGOutflow" [date]
-   ENDFOR;
-
-      END_IF_STATEMENT;
-
-      END_IF_STATEMENT;
-
-    END;
-
-    RULE                 "May Thru July Daily FG Outflow";
-    DESCRIPTION          "";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT IF ( @"Start Timestep" == @"24:00:00 June Max DayOfMonth, Current Year" OR @"Start Timestep" == @"24:00:00 July Max DayOfMonth, Current Year" )
-   THEN
-      "MonthIs"( { "May" } ) OR @"t" == @"Start Timestep"
-   ELSE
-      "MonthIs"( { "May" } )
-   ENDIF AND "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-      FOREACH (LIST dateFlow IN "SpringDateAndFlowLists"(  )) DO
-            $ "FlamingGorgeData.DailyFGOutflow" [GET @INDEX 0.00000000 FROM dateFlow] := GET @INDEX 1.00000000 FROM dateFlow;
-
-      ENDFOREACH;
-
-    END;
-
-    RULE                 "Release to Meet ULDE";
-    DESCRIPTION          "Overrides the baseflow rule for the months of March and April. During these months the May 1 ULDE could be adjusted based upon the &quot;projected&quot; unregulated inflow into Flaming Gorge. Also the release is not limited by the baseflow max and min constraints, as the reservoir needs to release whatever necessary to meet the May 1 target. -HG 10/9/12 ";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "MonthIs"( { "March" , "April" } ) AND "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-    DESCRIPTION          "If it is March or April, then release whatever necessary to meet the May 1 ULDE, regardless of the Baseflow Limits. -HG 9/12/12";
-      $ "FlamingGorge.Outflow" [] := "GetFGBaseFlowMagnitudeUnconstrained"(  );
-
-    END;
-
-    RULE                 "Adaptive Management Adjustments ";
-    DESCRIPTION          "This rule determines baseflow for various period of the year. From the end of the Ramp Down Period through the end of September 140% of the maximum baseflow limit is released as requested by the USFWS. For the months of October and November either 60% of the minimum baseflow for the current hydrologic classification, or the absolute minimum baseflow is released to meet USFWS requests, whichever is greater. For December through Feburary, 125% of the maximum baseflow limit is released to meet Western requests as long as the maximum pool elevation at the end of the period will be greater than 6018 ft. Otherwise the maximum baseflow limit is released for this period. -CE 6/12/2013";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 2.00000000 AND NOT "MonthIs"( { "March" , "April" } ) AND IF ( "RunStartDate"(  ) >= @"May" )
-   THEN
-      @"t" < "CompletePartialDate"( @"April Max DayOfMonth", "OffsetDate"( "RunStartDate"(  ), 1.00000000, "1 years" ) )
-   ELSE
-      "StartYear"(  )
-   ENDIF;
-    BEGIN
-
-      $ "FlamingGorge.Outflow" [] := WITH DATETIME HClassYear = IF ( "MonthIs"( { "May" , "June" , "July" , "August" , "September" , "October" , "November" , "December" } ) OR "StartYear"(  ) COMMENTED_BY "Previous Year's April through July volume is not know during the start year of the run,<br> therefore use the current year's target. -HG 10/3/12" )
-   THEN
-      @"24:00:00 December Max DayOfMonth, Current Year"
-   ELSE
-      @"24:00:00 December Max DayOfMonth, Previous Year"
-   ENDIF COMMENTED_BY "Selects the correct April through July period to be considered for basefow operations. <br>In actual operations the HClass would be based upon the previous April - July period for baseflow purposes.-HG 9/13/12" DO
-      IF ( "MonthIs"( { "May" , "June" , "July" , "August" , "September" } ) )
-      THEN
-         ( "GetFGBaseFlowMagnitude"(  ) * 1.40000000 ) COMMENTED_BY "From the end of the Ramp Down Period through the end of September, USFWS requests +40% of the maximum baseflow limit be released. -HG 10/29/12"
-      ELSE
-         IF ( "MonthIs"( { "October" , "November" } ) )
-         THEN
-            "GetFGBaseFlowMagnitude"(  ) COMMENTED_BY "For October and November the USFWS requests -40% of the minimum baseflow limit be released. This value is constrained by the minimum flow limit as well. -HG 10/29/12"
-         ELSE
-            IF ( "MonthIs"( { "December" , "January" , "February" } ) )
-            THEN
-               WITH NUMERIC BelowLimitBaseflow = "GetFGBaseFlowMagnitude"(  ) DO
-                  WITH NUMERIC AboveLimitBaseflow = "GetFGBaseFlowMagnitude"(  ) * 1.20000000 DO
-                     IF ( "StorageToElevation"( % "FlamingGorge", ( $ "FlamingGorge.Storage" [@"t - 1"] + "SumFlowsToVolumeSkipNaN"( $ "FlamingGorge.Inflow", @"t", IF ( "MonthIs"( { "December" } ) )
-                     THEN
-                        @"24:00:00 February Max DayOfMonth, Next Year"
-                     ELSE
-                        @"24:00:00 February Max DayOfMonth, Current Year"
-                     ENDIF ) - AboveLimitBaseflow * 3.00000000 "month" ) ) > $ "FlamingGorgeData.WesternWinterReleaseElevLimit" [] )
-                     THEN
-                        AboveLimitBaseflow
-                     ELSE
-                        BelowLimitBaseflow
-                     ENDIF
-                  ENDWITH
-               ENDWITH COMMENTED_BY "During December through February, Western requests +25% of the maximum baseflow limit be released. <br>This request can be honored as long as the resulting pool elevation at the end of the period will  be greater than 6018 ft. <br>If the resulting pool elevation is not greater than 6018 ft. the maximum baseflow limit will be used.<br>-HG 10/29/12"
-            ELSE
-               $ "FlamingGorge.Outflow" []
-            ENDIF
-         ENDIF
-      ENDIF
-   ENDWITH;
-
-    END;
-
-    RULE                 "Base Flow Operations";
-    DESCRIPTION          "Sets the baseflow for each month, except March and April where the baseflow is set by a later rule.  -HG 10/9/12";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 2.00000000 AND NOT "MonthIs"( { "March" , "April" } );
-    BEGIN
-
-      $ "FlamingGorge.Outflow" [] := "Max"( "GetFGBaseFlowMagnitude"(  ), "VolumeToFlow"( "PrevStorage"( % "FlamingGorge" ), @"t" ) + $ "FlamingGorge.Inflow" [] - "VolumeToFlow"( "ElevationToStorage"( % "FlamingGorge", 6039.50000000 "ft" ), @"t" ) );
-
-    END;
-
-    RULE                 "Hydrologic Classification";
-    DESCRIPTION          "This rule determines the hydraulic classification index (0: Dry, 1: ModDry, 2: Ave, 3: ModWet, 4: Wet) for Flaming Gorge inflow and the Yampa River for each timestep. - CE 6/11/13";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
-            IF_STATEMENT (NOT IsNaN $ "FlamingGorgeData.AprJulPercentExceedance" ["Dec31ofYear"( date )]) THEN
-          DESCRIPTION          "Flaming Gorge";
-      FOREACH (NUMERIC index IN { 0.00000000 , 1.00000000 , 2.00000000 , 3.00000000 , 4.00000000 }) DO
-            IF_STATEMENT ($ "FlamingGorgeData.AprJulPercentExceedance" ["Dec31ofYear"( date )] <= $ "FlamingGorgeData.HydrologicClassPercentileLimits" [index, 1.00000000]) THEN
-            IF_STATEMENT (IsNaN $ "FlamingGorgeData.HClass" ["Dec31ofYear"( date )]) THEN
-            $ "FlamingGorgeData.HClass" ["Dec31ofYear"( date )] := index;
-
-      END_IF_STATEMENT;
-
-      END_IF_STATEMENT;
-
-      ENDFOREACH;
-
-      END_IF_STATEMENT;
-
-            IF_STATEMENT (NOT IsNaN $ "FlamingGorgeData.YampaAprJulPercentExceedance" ["Dec31ofYear"( date )]) THEN
-          DESCRIPTION          "Yampa";
-      FOREACH (NUMERIC index IN { 0.00000000 , 1.00000000 , 2.00000000 , 3.00000000 , 4.00000000 }) DO
-            IF_STATEMENT ($ "FlamingGorgeData.YampaAprJulPercentExceedance" ["Dec31ofYear"( date )] <= $ "FlamingGorgeData.HydrologicClassPercentileLimits" [index, 1.00000000]) THEN
-            IF_STATEMENT (IsNaN $ "FlamingGorgeData.YampaHClass" ["Dec31ofYear"( date )]) THEN
-            $ "FlamingGorgeData.YampaHClass" ["Dec31ofYear"( date )] := index;
-
-      END_IF_STATEMENT;
-
-      END_IF_STATEMENT;
-
-      ENDFOREACH;
-
-      END_IF_STATEMENT;
-
-      ENDFOREACH;
-
-    END;
-
-    RULE                 "Calc Percent Exceedance";
-    DESCRIPTION          "This rule calcualtes the exceedence percentage of the April to July Flaming Gorge inflow volume and the Yamper River flow volume for each year in the study period based on the historic data. - CE 6/11/13";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
-            IF_STATEMENT (NOT IsNaN $ "FlamingGorgeData.AprJulInflowVolume" ["Dec31ofYear"( date )]) THEN
-            $ "FlamingGorgeData.AprJulPercentExceedance" ["Dec31ofYear"( date )] := 1.00000000 - "PercentRank"( "GetSlotVals"( $ "FlamingGorgeData.AprJulVolAnnual", "GetDate"( "December 31, " CONCAT "GetYearAsString"( "NumberToDate"( $ "FlamingGorgeData.HydrologicClassificationPeriod" [0.00000000, "Start Year"] ) ) ), "GetDate"( "December 31, " CONCAT "GetYearAsString"( "NumberToDate"( $ "FlamingGorgeData.HydrologicClassificationPeriod" [0.00000000, "End Year"] ) ) ) ), $ "FlamingGorgeData.AprJulInflowVolume" ["Dec31ofYear"( date )] );
-
-      END_IF_STATEMENT;
-
-            IF_STATEMENT (NOT IsNaN $ "FlamingGorgeData.YampaAprJulVol" ["Dec31ofYear"( date )]) THEN
-            $ "FlamingGorgeData.YampaAprJulPercentExceedance" ["Dec31ofYear"( date )] := 1.00000000 - "PercentRank"( "GetSlotVals"( $ "FlamingGorgeData.YampaAprJulVolAnnual", "GetDate"( "December 31, " CONCAT "GetYearAsString"( "NumberToDate"( $ "FlamingGorgeData.HydrologicClassificationPeriod" [0.00000000, "Start Year"] ) ) ), "GetDate"( "December 31, " CONCAT "GetYearAsString"( "NumberToDate"( $ "FlamingGorgeData.HydrologicClassificationPeriod" [0.00000000, "End Year"] ) ) ) ), $ "FlamingGorgeData.YampaAprJulVol" ["Dec31ofYear"( date )] );
-
-      END_IF_STATEMENT;
-
-      ENDFOREACH;
-
-    END;
-
-    RULE                 "Calc April July Volume For Model Run Period";
-    DESCRIPTION          "This rule calculates the April through July inflow volume into Flaming Gorge and the April though July outflow volume for the Yampa River. Flamming Gorge inflows are set during the first runcycle so the April-July volume can be calculated at the beginning of the second runcycle. In actual operation forcasted inflows are used to determine an April-July volume in March then the forcasted value is checked against measured values in August. - CE 6/11/13";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-    DESCRIPTION          "Spring flow and baseflow operations interested in the april - july <br>volume. This number is used to determine the Hydrologic Classification which is used to<br>determine: May 1 ULDE, Spring Peak magnitude, spring peak duration, Ramp Up Rates, <br>Ramp Down Rates, etc. <br><br>In actual operations this number would would be calculated in March using forecasted April - July inflows and then recalculated in August using the observed April - July inflows. <br>Since Flaming Gorge inflow is set during run cycle one, we can use the known values for the<br>entire run. Therefore, we calculate the April -July Volumes once for each year of the run. <br><br>Rules and Functions calling upon these slots will need to know which year to reference. <br><br>-HG 9/13/12";
-      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
-          DESCRIPTION          "Temporary Check. May remove this IF statement once the historic values are added to the model as input along with the forecast values, although it should not cause problems if left.<br>This will ensure that the rule fires for all years with a complete April through July dataset; it will not fail due to missing data at the start or end year. -HG 10/8/12";
-      IF_STATEMENT (NOT IsNaN $ "FlamingGorgeInflow.Unregulated" ["April30ofYear"( date )] AND NOT IsNaN $ "FlamingGorgeInflow.Unregulated" ["July31ofYear"( date )]) THEN
-            $ "FlamingGorgeData.AprJulInflowVolume" ["Dec31ofYear"( date )] := "SumFlowsToVolume"( $ "FlamingGorgeInflow.Unregulated", "April30ofYear"( date ), "July31ofYear"( date ) );
-
-      END_IF_STATEMENT;
-
-            IF_STATEMENT (NOT IsNaN $ "YampaRiverInflow.Yampa_at_Deerlodge" ["April30ofYear"( date )] AND NOT IsNaN $ "YampaRiverInflow.Yampa_at_Deerlodge" ["July31ofYear"( date )]) THEN
-            $ "FlamingGorgeData.YampaAprJulVol" ["Dec31ofYear"( date )] := "SumFlowsToVolume"( $ "YampaRiverInflow.Yampa_at_Deerlodge", "April30ofYear"( date ), "July31ofYear"( date ) );
-
-      END_IF_STATEMENT;
-
-      ENDFOREACH;
-
-    END;
-
-    RULE                 "Calculate April July Volume For Hydrologic Classifcation Period";
-    DESCRIPTION          "This rule calculates the annual unregulated April through July inflow volume into Flaming Gorge and the annual Yampa River April through July inflow volume for all of the years in the Hydrologic Classification Period. -CE 6/11/13";
-    ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT @"t" == "RunStartDate"(  ) AND "GetRunCycleIndex"(  ) == 2.00000000;
-    BEGIN
-
-    DESCRIPTION          "Flaming Gorge Unregulated Apr-Jul Inflow volume";
-      FOREACH (DATETIME time IN "GetDates"( "NumberToDate"( $ "FlamingGorgeData.HydrologicClassificationPeriod" [0.00000000, "Start Year"] ), "NumberToDate"( $ "FlamingGorgeData.HydrologicClassificationPeriod" [0.00000000, "End Year"] ), "1 years" )) DO
-            $ "FlamingGorgeData.AprJulVolAnnual" ["GetDate"( "December 31, " CONCAT "GetYearAsString"( time ) )] := WITH STRING year = "GetYearAsString"( time ) DO
-      "SumFlowsToVolumeSkipNaN"( $ "FlamingGorgeInflow.Unregulated", "GetDate"( "April, " CONCAT year ), "GetDate"( "July, " CONCAT year ) )
-   ENDWITH;
-
-      ENDFOREACH;
-
-    DESCRIPTION          "Yampa Apr-Jul Inflow Vol";
-      FOREACH (DATETIME time IN "GetDates"( "NumberToDate"( $ "FlamingGorgeData.YampaHydrologicClassificationPeriod" [0.00000000, "Start Year"] ), "NumberToDate"( $ "FlamingGorgeData.YampaHydrologicClassificationPeriod" [0.00000000, "End Year"] ), "1 years" )) DO
-            $ "FlamingGorgeData.YampaAprJulVolAnnual" ["GetDate"( "December 31, " CONCAT "GetYearAsString"( time ) )] := WITH STRING year = "GetYearAsString"( time ) DO
-      "SumFlowsToVolume"( $ "YampaRiverInflow.Maybelle", "GetDate"( "April, " CONCAT year ), "GetDate"( "July, " CONCAT year ) )
-   ENDWITH;
-
-      ENDFOREACH;
-
-    END;
-
-  END;
-
   POLICY_GROUP   "Flaming Gorge ";
   DESCRIPTION    "";
   ACTIVE         TRUE;
@@ -3812,7 +3528,7 @@ BEGIN
 
     RULE                 "Min Flow";
     DESCRIPTION          "This rule ensurs that the minimum instream flow requirements are met. If a lower priority rule sets the flow lower than the min flow then this rule resets the flow. ";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT ( "HasAnyRuleFired"( { "Safe Channel Capacity" , "Set September-November Baseflow" , "Set December-March Baseflow" , "Set April or August Outflow" , "Set Baseflow in off month" , "Set June Outflow" , "Set July Outflow" } ) AND "GetRunCycleIndex"(  ) == 1.00000000 ) COMMENTED_BY "This is necessary for 1,2,3 rule order to prevent trumping of lower priority rules. <br>Not necessary in 3,2,1 order but does not hurt anything. ";
     BEGIN
 
@@ -3825,7 +3541,7 @@ BEGIN
 
     RULE                 "Max Elevation";
     DESCRIPTION          "This rule prevents overtopping. If a previous rule sets the outflow such that the elevation would overtop the dam, this rule will set the outflow to prevent this.";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT ( "HasAnyRuleFired"( { "Safe Channel Capacity" , "Set September-November Baseflow" , "Set December-March Baseflow" , "Set April or August Outflow" , "Set Baseflow in off month" , "Set June Outflow" , "Set July Outflow" } ) AND "GetRunCycleIndex"(  ) == 1.00000000 ) COMMENTED_BY "This is necessary for 1,2,3 rule order to prevent trumping of lower priority rules. <br>Not necessary in 3,2,1 order but does not hurt anything. ";
     BEGIN
 
@@ -3839,7 +3555,7 @@ BEGIN
 
     RULE                 "Min Elevation";
     DESCRIPTION          "If the outflow set by RiverWare will result in a pool elevation less than the minimum pool elevation for Fontenelle, then the outflow is reduced so that the minimum pool elevation is achieved. -ce 6/6/13";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
@@ -3852,7 +3568,7 @@ BEGIN
 
     RULE                 "Safe Channel Capacity";
     DESCRIPTION          "Prevents outflow from exceeding safe channel capacity unless there is a chance of overtopping, in which case, the &quot;Max Elevation&quot; rule will take precedence. ";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "HasAnyRuleFired"( { "Safe Channel Capacity" , "Set September-November Baseflow" , "Set December-March Baseflow" , "Set April or August Outflow" , "Set Baseflow in off month" , "Set June Outflow" , "Set July Outflow" } ) AND "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
@@ -3865,7 +3581,7 @@ BEGIN
 
     RULE                 "Set September-March Baseflow";
     DESCRIPTION          "Compute the steady flow over September to March necsessary to meet Apr 1 target. <br>Change in storage plus forecasted volume divided by 3 months.  The next two months <br>will look back at this value.";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "GetMonthAsString"( @"t" ) IN { "September" } AND "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
@@ -3878,7 +3594,7 @@ BEGIN
 
     RULE                 "Set December-March Baseflow";
     DESCRIPTION          "This rule is the second of two that set the steady baseflow at Fontenelle.  This rule looks ahead at the forecasted volumes and determines what the max steady flow for the months of September-March can be. ";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "GetMonthAsString"( @"t" ) IN { "December" } AND "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
@@ -3889,7 +3605,7 @@ BEGIN
 
     RULE                 "Set August Outflow";
     DESCRIPTION          "Sets the April and August release to the maximum possible, this also sets May since May gets set to the same as April.";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "GetMonthAsString"( @"t" ) IN { "August" , "" } AND "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
@@ -3904,7 +3620,7 @@ BEGIN
 
     RULE                 "Set April Outflow";
     DESCRIPTION          "Determines the April outflow as either the powerplant capacity, or the steady release required to meet the July 1 target pool elevation, whichever is less. -ce 6/6/13";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "GetMonthAsString"( @"t" ) IN { "" , "April" } AND "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
@@ -3917,7 +3633,7 @@ BEGIN
 
     RULE                 "Set Baseflow in off month";
     DESCRIPTION          "Handles the case when the model is started in October, November, January, February, March, or May. In these months the baseflow needs to be set to whatever the previous month's value was. ";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "GetMonthAsString"( @"t" ) IN { "October" , "November" , "January" , "February" , "March" , "May" } AND "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
@@ -3933,7 +3649,7 @@ BEGIN
 
     RULE                 "Set June Outflow";
     DESCRIPTION          "This rule sets the June outflow such that the July 1 target elevation is met.  Alternate cases are when SolveOutflow returns a value greater the the max possible release or less than power plant capacity.  Min(MaxRelease, Max(Release to meet target, power plant capacity)).";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "GetMonthAsString"( @"t" ) IN { "June" } AND "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
@@ -3949,11 +3665,21 @@ BEGIN
 
     RULE                 "Set July Outflow";
     DESCRIPTION          "Solve for the outflow which will cause the pool elevation to reach the end of timestep target. Do not let outflow go below power plant capacity or above the max possible release.";
-    ACTIVE               TRUE;
+    ACTIVE               FALSE;
     RULE_EXEC_CONSTRAINT "GetMonthAsString"( @"t" ) IN { "July" } AND "GetRunCycleIndex"(  ) == 1.00000000;
     BEGIN
 
       $ "Fontenelle.Outflow" [] := "FontenelleTargetFlow"( $ "FontenelleData.August1Target" [] );
+
+    END;
+
+    RULE                 "Set Fontenelle Outflow";
+    DESCRIPTION          "This rule uses a more in depth function that replaces 11 rules that previously set the Fontenelle outflow.  The rule uses the function to set the Fontenelle outflow for the current timestep. TP 5/11/2015";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 1.00000000;
+    BEGIN
+
+      $ "Fontenelle.Outflow" [] := "FontenelleMontlyOutflow"(  );
 
     END;
 
@@ -4146,7 +3872,7 @@ BEGIN
     RULE                 "SumStateMonthlyOrders - DivReq-noP123b or IID";
     DESCRIPTION          "";
     ACTIVE               TRUE;
-    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep" OR @"t" == @"24:00:00 January 31, Current Year" AND "GetRunCycleIndex"(  ) == 1.00000000;
+    RULE_EXEC_CONSTRAINT TRUE;
     BEGIN
 
       FOREACH (DATETIME date IN @"24:00:00 January Max DayOfMonth, Current Year" TO @"24:00:00 December Max DayOfMonth, Current Year") DO
@@ -4756,6 +4482,13 @@ BEGIN
       "VolumeToFlow"( $ "Mexico_CU_Schedules.MexicoTJ" [date], date )
    ENDIF;
 
+            $ "MWDDiversion.Total Return Flow" [date] := IF ( date < @"Start Timestep" )
+   THEN
+      "VolumeToFlow"( $ "California_CU_Actual.MWDReturns" [date], date )
+   ELSE
+      "VolumeToFlow"( $ "California_CU_Schedules.MWDReturns" [date], date )
+   ENDIF;
+
             $ "MexicanTreatyDelivery:MexicoSched.Diversion Requested" [date] := IF ( date < @"Start Timestep" )
    THEN
       "VolumeToFlow"( $ "Mexico_CU_Actual.MexicoSched" [date] - $ "Mexico_CU_Actual.MexicoTJ" [date], date )
@@ -5205,7 +4938,7 @@ BEGIN
 
     END;
 
-    RULE                 "Set LB Demand Variability Triggers Above Parker";
+    RULE                 "Set LB Demand Variability Triggers Above Hoover";
     DESCRIPTION          "This rule fires in the beginning timestep but sets the trigger values for the whole run.  The rule fires on the beginning timestep.";
     ACTIVE               TRUE;
     RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep" AND "GetRunCycleIndex"(  ) == 1.00000000 AND NOT "HasRuleFiredSuccessfully"( "ThisRule" );
@@ -5281,6 +5014,7 @@ BEGIN
     RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep" AND "GetRunCycleIndex"(  ) == 1.00000000 AND NOT "HasRuleFiredSuccessfully"( "ThisRule" );
     BEGIN
 
+      BREAKPOINT BEFORE_EXEC TRUE;
       FOREACH (DATETIME date IN "GetDates"( @"Start Timestep", @"Finish Timestep", "1 Months" )) DO
             IF_STATEMENT (date == @"Start Timestep" OR "GetMonth"( date ) == 9.00000000 AND "OffsetDate"( date, 4.00000000, "1 Months" ) <= @"Finish Timestep") THEN
             IF_STATEMENT (date == @"Start Timestep") THEN
@@ -8884,6 +8618,66 @@ BEGIN
 
     END;
 
+    FUNCTION       "FontenelleMontlyOutflow" (  )
+    RETURN_TYPE    NUMERIC;
+    SCALE_UNITS    "";
+    DESCRIPTION    "This function returns a monthly outflow for Fontenelle reservoir based on the monthl logic that has always been in the MTOM model.  There are various constraints for some months where the logic is specified for that month and for those months that are not specified, the outflow is set to the outflow of the month before.  All of the monthly flows are constrained to the Min and Max constraints that are conditioned into the function and can be viewed when the &quot;Post-Exec. Checks&quot; box is checked.  <br><br>This rule replaces a series of 11 other rules that made similar checks.  5/11/2015";
+    ACTIVE         TRUE;
+    PRE_EXEC_DIAG  FALSE;
+    POST_EXEC_DIAG FALSE;
+    MIN_CONSTRAINT "MaxItem"( { $ "FontenelleData.MinFlow" [] , "SolveOutflow"( % "Fontenelle", $ "Fontenelle.Inflow" [], "ElevationToStorage"( % "Fontenelle", $ "FontenelleData.MaxElevation" [] ), $ "Fontenelle.Storage" [@"t - 1"], @"t" ) } );
+    MAX_CONSTRAINT IF ( "SolveOutflow"( % "Fontenelle", $ "Fontenelle.Inflow" [], "ElevationToStorage"( % "Fontenelle", $ "FontenelleData.MaxElevation" [] ), $ "Fontenelle.Storage" [@"t - 1"], @"t" ) < 0.00000000 "acre-ft/month" )
+   THEN
+      "Min"( $ "FontenelleData.SafeChannelCapacity" [], "SolveOutflow"( % "Fontenelle", $ "Fontenelle.Inflow" [], "ElevationToStorage"( % "Fontenelle", $ "FontenelleData.MinElevation" [] ), $ "Fontenelle.Storage" [@"t - 1"], @"t" ) )
+   ELSE
+      "Max"( $ "FontenelleData.SafeChannelCapacity" [], "SolveOutflow"( % "Fontenelle", $ "Fontenelle.Inflow" [], "ElevationToStorage"( % "Fontenelle", $ "FontenelleData.MaxElevation" [] ), $ "Fontenelle.Storage" [@"t - 1"], @"t" ) )
+   ENDIF;
+    BEGIN
+
+      IF ( "MonthIs"( { "July" } ) )
+   THEN
+      "FontenelleTargetFlow"( $ "FontenelleData.August1Target" [] )
+   ELSE
+      IF ( "MonthIs"( { "June" } ) )
+      THEN
+         IF ( $ "Fontenelle.Pool Elevation" [] > $ "FontenelleData.July1Target" [] )
+         THEN
+            "FontenelleTargetFlow"( $ "FontenelleData.August1Target" [] )
+         ELSE
+            "FontenelleTargetFlow"( $ "FontenelleData.July1Target" [] )
+         ENDIF
+      ELSE
+         IF ( "MonthIs"( { "April" } ) )
+         THEN
+            "Min"( ( ( "ElevationToStorage"( % "Fontenelle", $ "Fontenelle.Pool Elevation" [@"t"] ) - "ElevationToStorage"( % "Fontenelle", $ "FontenelleData.July1Target" [] ) + "SumFlowsToVolume"( $ "Fontenelle.Inflow", @"t", @"t + 2" ) ) / 3.00000000 "month" ) COMMENTED_BY "Steady release over April, May and June to meet July1 Target", "GetMaxReleaseGivenInflow"( % "Fontenelle", $ "Fontenelle.Inflow" [], @"t" ) COMMENTED_BY "Power Plant Capacity" )
+         ELSE
+            IF ( "MonthIs"( { "August" } ) )
+            THEN
+               "GetMaxReleaseGivenInflow"( % "Fontenelle", $ "Fontenelle.Inflow" [], @"t" )
+            ELSE
+               IF ( "MonthIs"( { "December" } ) )
+               THEN
+                  ( ( "ElevationToStorage"( % "Fontenelle", $ "Fontenelle.Pool Elevation" [@"t"] ) - "ElevationToStorage"( % "Fontenelle", $ "FontenelleData.April1Target" [] ) + "SumFlowsToVolume"( $ "Fontenelle.Inflow", @"t", @"t + 3" ) ) / 4.00000000 "month" ) COMMENTED_BY "Compute the steady flow over December to March necsessary to meet Apr 1 target. Change in storage plus forecasted volume divided by 4 months. The next 3 months will look back at this value."
+               ELSE
+                  IF ( "MonthIs"( { "September" } ) )
+                  THEN
+                     ( ( "ElevationToStorage"( % "Fontenelle", $ "Fontenelle.Pool Elevation" [@"t"] ) - "ElevationToStorage"( % "Fontenelle", $ "FontenelleData.April1Target" [] ) + "SumFlowsToVolume"( $ "Fontenelle.Inflow", @"t", @"t + 6" ) ) / 7.00000000 "month" ) COMMENTED_BY "Compute the steady flow over September to March necsessary to meet Apr 1 target. Change in storage plus forecasted volume divided by 3 months.  The next two months will look back at this value."
+                  ELSE
+                     IF ( "MonthIs"( { "May" } ) )
+                     THEN
+                        "Max"( $ "Fontenelle.Outflow" [@"t - 1"], "SolveOutflow"( % "Fontenelle", % "Fontenelle" & "Inflow" [@"t"], "ElevationToStorage"( % "Fontenelle", 6480.00000000 "ft" ), "ElevationToStorage"( % "Fontenelle", $ "Fontenelle.Pool Elevation" [@"t - 1"] ), @"t" ) )
+                     ELSE
+                        $ "Fontenelle.Outflow" [@"t - 1"]
+                     ENDIF
+                  ENDIF
+               ENDIF
+            ENDIF
+         ENDIF
+      ENDIF
+   ENDIF;
+
+    END;
+
     FUNCTION       "FontenelleTargetFlow" ( NUMERIC Elevation )
     RETURN_TYPE    NUMERIC;
     SCALE_UNITS    "";
@@ -8924,7 +8718,12 @@ BEGIN
       THEN
          0.00000000 "acre-ft"
       ELSE
-         - "Min"( NaNToZero ( $ "LowerBasinDemandVariability.MWDLBDVDifference" ["Dec31ofYear"( @"t" )] ), 0.00000000 "acre-ft" )
+         IF ( NaNToZero ( $ "Surplus.Domestic Surplus Flag" [@"24:00:00 December 31, Current Year"] ) > 0.00000000 )
+         THEN
+            125000.00000000 "acre-ft"
+         ELSE
+            - "Min"( NaNToZero ( $ "LowerBasinDemandVariability.MWDLBDVDifference" ["Dec31ofYear"( @"t" )] ), 0.00000000 "acre-ft" )
+         ENDIF
       ENDIF DO
          WITH NUMERIC totalDeliveryOfCAICS = IF ( ( GET @INDEX 0.00000000 FROM "TotalDeliveryOfCaliforniaICS"( creationOfCACEICS, nevadaBankingToCA ) ) < 0.00000000 "acre-ft" AND ( GET @INDEX 1.00000000 FROM "TotalDeliveryOfCaliforniaICS"( creationOfCACEICS, nevadaBankingToCA ) ) == 0.00000000 )
          THEN
@@ -9054,7 +8853,7 @@ BEGIN
                               WITH NUMERIC SysBiNatAZ = ( $ "ICS Credits.BiNationalICS_AZ" [@"24:00:00 December Max DayOfMonth, Previous Year"] + creationOfBiNat - deliveryChargedToBiNat ) COMMENTED_BY "Resulting Bi National ICS " DO
                                  WITH NUMERIC totalICSAZ = ( SysECAZ + SysSEAZ + SysBiNatAZ ) COMMENTED_BY "Total ICS" DO
                                     WITH NUMERIC totalICSAZDelivery = deliveryChargedToEC + deliveryChargedToSE + deliveryChargedToBiNat DO
-                                       WITH NUMERIC totalICSAZCreation = creationOfEC + creationOfSE + creationOfBiNat DO
+                                       WITH NUMERIC totalICSAZCreation = creationOfEC DO
                                           { deliveryChargedToEC , deliveryChargedToSE , deliveryChargedToBiNat , SysECAZ , SysSEAZ , SysBiNatAZ , totalICSAZ , totalICSAZDelivery , totalICSAZCreation }
                                        ENDWITH
                                     ENDWITH
@@ -9207,16 +9006,33 @@ BEGIN
                                        WITH NUMERIC impDSSICSNV = creationImpDSS_NV * 0.95000000 - deliveryImpDSS_NV DO
                                           WITH NUMERIC SysECNV = IF ( NaNToZero ( $ "Shortage.Shortage Flag" [@"24:00:00 December 31, Current Year"] ) > 0.00000000 )
                                           THEN
-                                             $ "ICS Credits.ExtraordinaryConservationICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] + tribICSNV + impICSNV - $ "ICS Credits.AnnualDeliveryEC_NV" ["Dec31ofYear"( @"t" )] + creationEC * 0.95000000
+                                             $ "ICS Credits.ExtraordinaryConservationICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] + $ "ICS Credits.TributaryICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] + $ "ICS Credits.ImportedICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] - $ "ICS Credits.AnnualDeliveryEC_NV" ["Dec31ofYear"( @"t" )]
                                           ELSE
-                                             ( $ "ICS Credits.ExtraordinaryConservationICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] + tribICSNV + impICSNV - $ "ICS Credits.AnnualDeliveryEC_NV" ["Dec31ofYear"( @"t" )] ) * 0.97000000 + creationEC * 0.95000000
+                                             ( $ "ICS Credits.ExtraordinaryConservationICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] + $ "ICS Credits.TributaryICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] + $ "ICS Credits.ImportedICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] - $ "ICS Credits.AnnualDeliveryEC_NV" ["Dec31ofYear"( @"t" )] ) * 0.97000000 + creationEC * 0.95000000
                                           ENDIF COMMENTED_BY "Resulting ExtraOrdinaryConservation ICS " DO
                                              WITH NUMERIC SysSENV = ( $ "ICS Credits.SystemEfficiencyICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] + creationSE - $ "ICS Credits.AnnualDeliverySysEff_NV" ["Dec31ofYear"( @"t" )] ) COMMENTED_BY "Resulting System Efficiency ICS " DO
                                                 WITH NUMERIC SysBiNatNV = ( $ "ICS Credits.BiNationalICS_NV" [@"24:00:00 December Max DayOfMonth, Previous Year"] + creationBiNat - $ "ICS Credits.AnnualDeliveryBiNat_NV" ["Dec31ofYear"( @"t" )] ) COMMENTED_BY "Resulting Bi National ICS " DO
                                                    WITH NUMERIC totalICSNV = ( tribICSNV + impICSNV + SysECNV + SysSENV + SysBiNatNV ) COMMENTED_BY "Total ICS" DO
                                                       WITH NUMERIC nvICSCreated = creationTribICS_NV + creationIMPICS_NV + creationTribDSS_NV + creationImpDSS_NV + $ "ICS Credits.AnnualCreationEC_NV" ["Dec31ofYear"( @"t" )] + $ "ICS Credits.AnnualCreationSysEff_NV" ["Dec31ofYear"( @"t" )] + $ "ICS Credits.AnnualCreationBiNat_NV" ["Dec31ofYear"( @"t" )] DO
                                                          WITH NUMERIC nvICSDelivered = $ "ICS Credits.AnnualDeliveryTrib_NV" ["Dec31ofYear"( @"t" )] + $ "ICS Credits.AnnualDeliveryImp_NV" ["Dec31ofYear"( @"t" )] + deliveryTribDSS_NV + deliveryImpDSS_NV + $ "ICS Credits.AnnualDeliveryEC_NV" ["Dec31ofYear"( @"t" )] + $ "ICS Credits.AnnualDeliverySysEff_NV" ["Dec31ofYear"( @"t" )] + $ "ICS Credits.AnnualDeliveryBiNat_NV" ["Dec31ofYear"( @"t" )] DO
-                                                            { creationTribICS_NV , creationTribDSS_NV , SysSENV , SysECNV , tribDSSICSNV , impDSSICSNV , SysBiNatNV , totalICSNV , deliveryTribDSS_NV , deliveryImpDSS_NV , creationIMPICS_NV , creationImpDSS_NV , impICSNV , tribICSNV }
+                                                            WITH NUMERIC snwpDiversion = IF ( NaNToZero ( $ "Shortage.Shortage Flag" ["Dec31ofYear"( @"t" )] ) > 0.00000000 )
+                                                            THEN
+                                                               WITH NUMERIC dssDeliveries = deliveryTribDSS_NV + deliveryImpDSS_NV DO
+                                                                  WITH NUMERIC shortageVolume = $ "Shortage.State Shortage Volumes" [( $ "Shortage.Shortage Flag" ["Dec31ofYear"( @"t" )] ) - 1.00000000, "Nevada"] DO
+                                                                     WITH NUMERIC nonSNWPNVDemands = FOR ( DATETIME date IN "DateMax"( @"24:00:00 January Max DayOfMonth, Current Year", @"24:00:00 January Max DayOfMonth, Current Year" ) TO @"24:00:00 December Max DayOfMonth, Current Year" ) STAT_SUM
+                                                                        FOR ( OBJECT diversionSite IN { % "NvDvsToPkr:BigBend" , % "NvDvsToPkr:SCE" , % "FtMohaveIndRes:NV" , % "OthersMeadToMohave:LMNRA Nv Mohave" } ) STAT_SUM
+                                                                           "FlowToVolume"( diversionSite & "Diversion Requested" [date], date )
+                                                                        ENDFOR
+                                                                     ENDFOR DO
+                                                                        ( 300000.00000000 "acre-ft" + dssDeliveries - shortageVolume ) - nonSNWPNVDemands
+                                                                     ENDWITH
+                                                                  ENDWITH
+                                                               ENDWITH
+                                                            ELSE
+                                                               0.00000000 "acre-ft"
+                                                            ENDIF DO
+                                                               { creationTribICS_NV , creationTribDSS_NV , SysSENV , SysECNV , tribDSSICSNV , impDSSICSNV , SysBiNatNV , totalICSNV , deliveryTribDSS_NV , deliveryImpDSS_NV , creationIMPICS_NV , creationImpDSS_NV , impICSNV , tribICSNV , snwpDiversion }
+                                                            ENDWITH COMMENTED_BY "IF there is shortage, then adjust the Pumping Schedule from Lake Mead by this difference in <br>300,000 Af plus DSS deliveries, minus the shortage Volume, and minus all other non SNWP <br>Nevada Demands. TP 4/30/2015"
                                                          ENDWITH
                                                       ENDWITH
                                                    ENDWITH
@@ -9228,6 +9044,50 @@ BEGIN
                                  ENDWITH
                               ENDWITH
                            ENDWITH
+                        ENDWITH
+                     ENDWITH
+                  ENDWITH
+               ENDWITH
+            ENDWITH
+         ENDWITH
+      ENDWITH
+   ENDWITH;
+
+    END;
+
+    FUNCTION       "NevadaBankingICS" (  )
+    RETURN_TYPE    LIST;
+    SCALE_UNITS    "";
+    DESCRIPTION    "";
+    ACTIVE         FALSE;
+    PRE_EXEC_DIAG  FALSE;
+    POST_EXEC_DIAG FALSE;
+    BEGIN
+
+      WITH NUMERIC unusedNV = IF ( NaNToZero ( $ "Shortage.Shortage Flag" [@"24:00:00 December 31, Current Year"] ) > 0.00000000 )
+   THEN
+      0.00000000 "acre-ft"
+   ELSE
+      300000.00000000 "acre-ft" - $ "AnnualWaterUse.Nevada_Apportionment" ["Dec31ofYear"( @"t" )]
+   ENDIF DO
+      WITH NUMERIC nvBankedCA = IF ( NaNToZero ( $ "Shortage.Shortage Flag" [@"24:00:00 December 31, Current Year"] ) > 0.00000000 )
+      THEN
+         0.00000000 "acre-ft"
+      ELSE
+         unusedNV
+      ENDIF DO
+         WITH NUMERIC nvBankedAZ = IF ( NaNToZero ( $ "Shortage.Shortage Flag" [@"24:00:00 December 31, Current Year"] ) > 0.00000000 )
+         THEN
+            0.00000000 "acre-ft"
+         ELSE
+            0.00000000 "acre-ft"
+         ENDIF DO
+            WITH NUMERIC CumulativeNVBankedInCA = $ "ICS Credits.CumulativeNVBankedinCA" [@"24:00:00 December Max DayOfMonth, Previous Year"] + nvBankedCA - nvUnbankedCA DO
+               WITH NUMERIC AnnualNVRecoverableAZ = "Min"( 40000.00000000 "acre-ft", nvBankedAZ ) DO
+                  WITH NUMERIC AnnuaNVRecoverableCA = "Min"( 30000.00000000 "acre-ft", CumulativeNVBankedInCA ) DO
+                     WITH NUMERIC AnnualNVUnbankedFromAZ = "Min"( AnnualNVRecoverableAZ, nvUnbankedAZ ) DO
+                        WITH NUMERIC AnnualNVUnbankedFromCA = "Min"( AnnualNVRecoverableAZ, nvUnbankedCA ) DO
+                           ?
                         ENDWITH
                      ENDWITH
                   ENDWITH
@@ -9277,7 +9137,7 @@ BEGIN
                         ELSE
                            diversionSite & "Diversion Requested" [date]
                         ENDIF
-                     ENDFOR + $ "MWDDiversion:MWD.Diversion Requested" [date] + $ "OthersBlwImp:YumaIsland.Diversion Requested" [date] COMMENTED_BY "?!?!?!?!?!Should Yuma Iland be included in the diversions for California, it is not<br>on the Californica nonMWD WaterUsers sub basin. TP"
+                     ENDFOR + $ "MWDDiversion:MWD.Diversion Requested" [date]
                   ENDFOR, "Dec31ofYear"( @"t" ) ) ) COMMENTED_BY "This equation determines if the scheduled diversions for California are greater or less than<br>the California Apportionment for the given year.  If the value is positive, then the function<br>will return a positive creation value. " DO
                      "Max"( icsBalanceCA, 0.00000000 "acre-ft" )
                   ENDWITH
