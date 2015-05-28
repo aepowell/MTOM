@@ -1,5 +1,5 @@
 # RiverWare_Ruleset 6.6.3 Patch
-# Created 10:46 May 27, 2015
+# Created 09:58 May 28, 2015
 # 
 RULESET
 AGENDA_ORDER ASCENDING;
@@ -1511,7 +1511,7 @@ BEGIN
     BEGIN
 
       IF_STATEMENT ("MonthIs"( { "September" } )) THEN
-            $ "Powell.Outflow" [] := "GetSeptemberSteadyFlowRelease"( $ "PowellData.AnnualReleaseVolume" [] );
+            $ "Powell.Outflow" [] := "GetSeptemberSteadyFlowRelease"( $ "PowellData.TargetAnnualReleaseVolume" [] );
 
       END_IF_STATEMENT;
 
@@ -1581,12 +1581,12 @@ BEGIN
     BEGIN
 
       IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Lower", @"t", TRUE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Min"( "Max"( "LowerTierEqualizationRelease"( "RelativeEOWYDate"( @"t" ) ), $ "PowellData.PowellLowerTierMinAnnualRelease" [] ), $ "PowellData.PowellLowerTierMaxAnnualRelease" [] );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Min"( "Max"( "LowerTierEqualizationRelease"( "RelativeEOWYDate"( @"t" ) ), $ "PowellData.PowellLowerTierMinAnnualRelease" [] ), $ "PowellData.PowellLowerTierMaxAnnualRelease" [] );
 
       END_IF_STATEMENT;
 
       IF_STATEMENT ("MonthIs"( { "August" } ) AND "TierIs"( "Lower", @"t", FALSE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := "Min"( "Max"( "LowerTierEqualizationRelease"( "RelativeEOWYDate"( @"t + 2" ) ), $ "PowellData.PowellLowerTierMinAnnualRelease" [] ), $ "PowellData.PowellLowerTierMaxAnnualRelease" [] );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := "Min"( "Max"( "LowerTierEqualizationRelease"( "RelativeEOWYDate"( @"t + 2" ) ), $ "PowellData.PowellLowerTierMinAnnualRelease" [] ), $ "PowellData.PowellLowerTierMaxAnnualRelease" [] );
 
       END_IF_STATEMENT;
 
@@ -1599,7 +1599,7 @@ BEGIN
     BEGIN
 
       IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Mid", @"t", TRUE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( IF ( $ "Mead.Pool Elevation" ["DateToCheckJan1Elevation"( @"t", TRUE )] >= 1025.00000000 "ft" )
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( IF ( $ "Mead.Pool Elevation" ["DateToCheckJan1Elevation"( @"t", TRUE )] >= 1025.00000000 "ft" )
    THEN
       7480.00000000 "1000 acre-ft"
    ELSE
@@ -1609,7 +1609,7 @@ BEGIN
       END_IF_STATEMENT;
 
       IF_STATEMENT ("MonthIs"( { "August" } ) AND "TierIs"( "Mid", @"t", FALSE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := IF ( $ "Mead.Pool Elevation" [@"24:00:00 December 31, Current Year"] >= 1025.00000000 "ft" )
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := IF ( $ "Mead.Pool Elevation" [@"24:00:00 December 31, Current Year"] >= 1025.00000000 "ft" )
    THEN
       7480.00000000 "1000 acre-ft"
    ELSE
@@ -1635,12 +1635,12 @@ BEGIN
 
       IF_STATEMENT (@"t" == @"Start Timestep" AND ( "TierIs"( "Upper", @"t", TRUE ) OR "TierIs"( "Equalization", @"t", TRUE ) ) AND NOT "MonthIs"( { "August" } )) THEN
             IF_STATEMENT (NOT "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t" ) ) == 0.00000000 "acre-ft") THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] + "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t" ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] + "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t" ) );
 
       END_IF_STATEMENT;
 
             IF_STATEMENT ($ "PowellData.UpperElevBalBranch" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] == 1.40000000) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( "EnsureReleaseLimits"( "EqualizationRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) ), 8230.00000000 "1000 acre-ft", 9000.00000000 "1000 acre-ft" ), NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"Start Timestep" ) )] ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( "EnsureReleaseLimits"( "EqualizationRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) ), 8230.00000000 "1000 acre-ft", 9000.00000000 "1000 acre-ft" ), NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"Start Timestep" ) )] ) );
 
       END_IF_STATEMENT;
 
@@ -1648,12 +1648,12 @@ BEGIN
 
       IF_STATEMENT ("MonthIs"( { "August" } ) OR "StartMonthIsSeptember"(  ) AND ( "TierIs"( "Upper", @"t", FALSE ) OR "TierIs"( "Equalization", @"t", FALSE ) )) THEN
             IF_STATEMENT (NOT "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t + 2" ) ) == 0.00000000 "acre-ft") THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] + "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t + 2" ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] + "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t + 2" ) );
 
       END_IF_STATEMENT;
 
             IF_STATEMENT ($ "PowellData.UpperElevBalBranch" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] == 1.40000000) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := "EnsureReleaseLimits"( "EqualizationRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) ), 8230.00000000 "1000 acre-ft", 9000.00000000 "1000 acre-ft" );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := "EnsureReleaseLimits"( "EqualizationRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) ), 8230.00000000 "1000 acre-ft", 9000.00000000 "1000 acre-ft" );
 
       END_IF_STATEMENT;
 
@@ -1668,7 +1668,7 @@ BEGIN
     BEGIN
 
       IF_STATEMENT (@"t" == @"Start Timestep" AND ( "GetRunCycleIndex"(  ) == 3.00000000 OR "IsYearDemandVariabilityAndRunCycle4"( @"t" ) ) AND "TierIs"( "Upper", @"t", TRUE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := WITH DATETIME meadProjecetionDate = IF ( @"t" <= @"September 30" )
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := WITH DATETIME meadProjecetionDate = IF ( @"t" <= @"September 30" )
    THEN
       @"24:00:00 December 31, Previous Year"
    ELSE
@@ -1702,7 +1702,7 @@ BEGIN
       END_IF_STATEMENT;
 
       IF_STATEMENT (( "MonthIs"( { "August" } ) OR "StartMonthIsSeptember"(  ) ) AND "TierIs"( "Upper", @"t", FALSE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := IF ( $ "Powell.Pool Elevation" ["DateToCheckEOWYElevation"( @"t", FALSE )] > "EqLevel"( "DateToCheckEOWYElevation"( @"t", FALSE ) ) )
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := IF ( $ "Powell.Pool Elevation" ["DateToCheckEOWYElevation"( @"t", FALSE )] > "EqLevel"( "DateToCheckEOWYElevation"( @"t", FALSE ) ) )
    THEN
       GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) )
    ELSE
@@ -1737,14 +1737,14 @@ BEGIN
     BEGIN
 
       IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Equalization", @"t", TRUE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) ), NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) ), NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] ) );
 
             $ "PowellData.ControllingEqualizationCondition" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := GET @INDEX 1.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) );
 
       END_IF_STATEMENT;
 
       IF_STATEMENT ("MonthIs"( { "August" } ) OR "StartMonthIsSeptember"(  ) AND "TierIs"( "Equalization", @"t", FALSE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) );
 
             $ "PowellData.ControllingEqualizationCondition" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := GET @INDEX 1.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) );
 
@@ -1772,8 +1772,8 @@ BEGIN
    ENDIF + FOR ( DATETIME date IN "WaterYearDatesByGroup"( watYearIndex ) ) STAT_SUM
       "FlowToVolume"( $ "Powell.Inflow" [date], date )
    ENDFOR ) COMMENTED_BY "This is added to check that in years when Powell might go very low, the model won't bomb out <br>when setting the preliminary release when Powell is low. TP 1/22/2013<br>") DO
-            IF_STATEMENT (NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "OffsetDate"( "RelativeEOWYDate"( @"Start Timestep" ), watYearIndex - 1.00000000, "1 years" ) ) )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "OffsetDate"( "RelativeEOWYDate"( @"Start Timestep" ), watYearIndex - 1.00000000, "1 years" ) )] := "Min"( "Max"( 8230.00000000 "1000 acre-feet", "CalcPrelimReleaseAmt_PreventModelCrash"( "WaterYearDatesByGroup"( watYearIndex ) ) ), availWatPowell );
+            IF_STATEMENT (NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "OffsetDate"( "RelativeEOWYDate"( @"Start Timestep" ), watYearIndex - 1.00000000, "1 years" ) ) )) THEN
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "OffsetDate"( "RelativeEOWYDate"( @"Start Timestep" ), watYearIndex - 1.00000000, "1 years" ) )] := "Min"( "Max"( 8230.00000000 "1000 acre-feet", "CalcPrelimReleaseAmt_PreventModelCrash"( "WaterYearDatesByGroup"( watYearIndex ) ) ), availWatPowell );
 
       END_IF_STATEMENT;
 
@@ -1789,8 +1789,8 @@ BEGIN
     RULE_EXEC_CONSTRAINT "IsYearDemandVariabilityAndRunCycle4"( @"t" ) AND @"t" == @"Start Timestep" AND NOT "HasRuleFiredSuccessfully"( "Current Rule" );
     BEGIN
 
-      IF_STATEMENT (NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "MaxItem"( { 8230.00000000 "1000 acre-feet" , "CalcPrelimReleaseAmt_PreventModelCrash"( "WaterYearDatesByGroup"( 1.00000000 ) ) , NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] ) } );
+      IF_STATEMENT (NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "MaxItem"( { 8230.00000000 "1000 acre-feet" , "CalcPrelimReleaseAmt_PreventModelCrash"( "WaterYearDatesByGroup"( 1.00000000 ) ) , NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] ) } );
 
       END_IF_STATEMENT;
 
@@ -1809,13 +1809,13 @@ BEGIN
     RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 3.00000000 AND ( @"t" == @"Start Timestep" OR "MonthIs"( { "August" } ) ) AND NOT "HasRuleFiredSuccessfully"( "Current Rule" );
     BEGIN
 
-      IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Lower", @"t", TRUE ) AND NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Min"( "Max"( "LowerTierEqualizationRelease"( "RelativeEOWYDate"( @"t" ) ), $ "PowellData.PowellLowerTierMinAnnualRelease" [] ), $ "PowellData.PowellLowerTierMaxAnnualRelease" [] );
+      IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Lower", @"t", TRUE ) AND NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Min"( "Max"( "LowerTierEqualizationRelease"( "RelativeEOWYDate"( @"t" ) ), $ "PowellData.PowellLowerTierMinAnnualRelease" [] ), $ "PowellData.PowellLowerTierMaxAnnualRelease" [] );
 
       END_IF_STATEMENT;
 
       IF_STATEMENT ("MonthIs"( { "August" } ) AND "TierIs"( "Lower", @"t", FALSE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := "Min"( "Max"( "LowerTierEqualizationRelease"( "RelativeEOWYDate"( @"t + 2" ) ), $ "PowellData.PowellLowerTierMinAnnualRelease" [] ), $ "PowellData.PowellLowerTierMaxAnnualRelease" [] );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := "Min"( "Max"( "LowerTierEqualizationRelease"( "RelativeEOWYDate"( @"t + 2" ) ), $ "PowellData.PowellLowerTierMinAnnualRelease" [] ), $ "PowellData.PowellLowerTierMaxAnnualRelease" [] );
 
       END_IF_STATEMENT;
 
@@ -1827,8 +1827,8 @@ BEGIN
     RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 3.00000000 AND ( @"t" == @"Start Timestep" OR "MonthIs"( { "August" } ) ) AND NOT "HasRuleFiredSuccessfully"( "Current Rule" );
     BEGIN
 
-      IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Mid", @"t", TRUE ) AND NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( IF ( $ "Mead.Pool Elevation" ["DateToCheckJan1Elevation"( @"t", TRUE )] >= 1025.00000000 "ft" )
+      IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Mid", @"t", TRUE ) AND NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( IF ( $ "Mead.Pool Elevation" ["DateToCheckJan1Elevation"( @"t", TRUE )] >= 1025.00000000 "ft" )
    THEN
       7480.00000000 "1000 acre-ft"
    ELSE
@@ -1838,7 +1838,7 @@ BEGIN
       END_IF_STATEMENT;
 
       IF_STATEMENT ("MonthIs"( { "August" } ) AND "TierIs"( "Mid", @"t", FALSE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := IF ( $ "Mead.Pool Elevation" [@"24:00:00 December 31, Current Year"] >= 1025.00000000 "ft" )
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := IF ( $ "Mead.Pool Elevation" [@"24:00:00 December 31, Current Year"] >= 1025.00000000 "ft" )
    THEN
       7480.00000000 "1000 acre-ft"
    ELSE
@@ -1862,14 +1862,14 @@ BEGIN
    ENDWITH;
     BEGIN
 
-      IF_STATEMENT (@"t" == @"Start Timestep" AND ( "TierIs"( "Upper", @"t", TRUE ) OR "TierIs"( "Equalization", @"t", TRUE ) ) AND NOT "MonthIs"( { "August" } ) AND NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
+      IF_STATEMENT (@"t" == @"Start Timestep" AND ( "TierIs"( "Upper", @"t", TRUE ) OR "TierIs"( "Equalization", @"t", TRUE ) ) AND NOT "MonthIs"( { "August" } ) AND NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
             IF_STATEMENT (NOT "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t" ) ) == 0.00000000 "acre-ft") THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] + "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t" ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] + "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t" ) );
 
       END_IF_STATEMENT;
 
             IF_STATEMENT ($ "PowellData.UpperElevBalBranch" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] == 1.40000000) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( "EnsureReleaseLimits"( "EqualizationRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) ), 8230.00000000 "1000 acre-ft", 9000.00000000 "1000 acre-ft" ), NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"Start Timestep" ) )] ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( "EnsureReleaseLimits"( "EqualizationRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) ), 8230.00000000 "1000 acre-ft", 9000.00000000 "1000 acre-ft" ), NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"Start Timestep" ) )] ) );
 
       END_IF_STATEMENT;
 
@@ -1877,12 +1877,12 @@ BEGIN
 
       IF_STATEMENT ("MonthIs"( { "August" } ) OR "StartMonthIsSeptember"(  ) AND ( "TierIs"( "Upper", @"t", FALSE ) OR "TierIs"( "Equalization", @"t", FALSE ) )) THEN
             IF_STATEMENT (NOT "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t + 2" ) ) == 0.00000000 "acre-ft") THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] + "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t + 2" ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] + "VolumeDeviationFromEOWYTarget"( "RelativeEOWYDate"( @"t + 2" ) );
 
       END_IF_STATEMENT;
 
             IF_STATEMENT ($ "PowellData.UpperElevBalBranch" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] == 1.40000000) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := "EnsureReleaseLimits"( "EqualizationRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) ), 8230.00000000 "1000 acre-ft", 9000.00000000 "1000 acre-ft" );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := "EnsureReleaseLimits"( "EqualizationRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) ), 8230.00000000 "1000 acre-ft", 9000.00000000 "1000 acre-ft" );
 
       END_IF_STATEMENT;
 
@@ -1896,8 +1896,8 @@ BEGIN
     RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 3.00000000 AND ( @"t" == @"Start Timestep" OR "MonthIs"( { "August" } ) ) AND NOT "HasRuleFiredSuccessfully"( "Current Rule" ) AND @"t + 2" <= @"Finish Timestep";
     BEGIN
 
-      IF_STATEMENT (@"t" == @"Start Timestep" AND ( "GetRunCycleIndex"(  ) == 3.00000000 OR "IsYearDemandVariabilityAndRunCycle4"( @"t" ) ) AND "TierIs"( "Upper", @"t", TRUE ) AND NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := WITH DATETIME meadProjecetionDate = IF ( @"t" <= @"September 30" )
+      IF_STATEMENT (@"t" == @"Start Timestep" AND ( "GetRunCycleIndex"(  ) == 3.00000000 OR "IsYearDemandVariabilityAndRunCycle4"( @"t" ) ) AND "TierIs"( "Upper", @"t", TRUE ) AND NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := WITH DATETIME meadProjecetionDate = IF ( @"t" <= @"September 30" )
    THEN
       @"24:00:00 December 31, Previous Year"
    ELSE
@@ -1931,7 +1931,7 @@ BEGIN
       END_IF_STATEMENT;
 
       IF_STATEMENT (( "MonthIs"( { "August" } ) OR "StartMonthIsSeptember"(  ) ) AND "TierIs"( "Upper", @"t", FALSE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := IF ( $ "Powell.Pool Elevation" ["DateToCheckEOWYElevation"( @"t", FALSE )] > "EqLevel"( "DateToCheckEOWYElevation"( @"t", FALSE ) ) )
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := IF ( $ "Powell.Pool Elevation" ["DateToCheckEOWYElevation"( @"t", FALSE )] > "EqLevel"( "DateToCheckEOWYElevation"( @"t", FALSE ) ) )
    THEN
       GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) )
    ELSE
@@ -1965,15 +1965,15 @@ BEGIN
     RULE_EXEC_CONSTRAINT ( "GetRunCycleIndex"(  ) == 3.00000000 AND ( @"t" == @"Start Timestep" OR "MonthIs"( { "August" } ) ) AND @"t + 2" <= @"Finish Timestep" AND NOT "HasRuleFiredSuccessfully"( "Current Rule" ) ) COMMENTED_BY "This rule only fires if we are in the third run cycle or in the fourth run cycle and demand variability<br> has changed the demands out of Lake Mead, it is August, and the model has selected the<br> Equalization teir for the current year. - sc 02/02/11 & TP 08/20/2014";
     BEGIN
 
-      IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Equalization", @"t", TRUE ) AND NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) ), NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] ) );
+      IF_STATEMENT (@"t" == @"Start Timestep" AND "TierIs"( "Equalization", @"t", TRUE ) AND NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "Max"( GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) ), NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] ) );
 
             $ "PowellData.ControllingEqualizationCondition" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := GET @INDEX 1.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", TRUE ) );
 
       END_IF_STATEMENT;
 
       IF_STATEMENT ("MonthIs"( { "August" } ) OR "StartMonthIsSeptember"(  ) AND "TierIs"( "Equalization", @"t", FALSE )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) );
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := GET @INDEX 0.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) );
 
             $ "PowellData.ControllingEqualizationCondition" ["Dec31ofYear"( "RelativeEOWYDate"( @"t + 2" ) )] := GET @INDEX 1.00000000 FROM "EqualizationTeirCalculationForRelease"( "DateToCheckEOWYElevation"( @"t", FALSE ) );
 
@@ -2001,8 +2001,8 @@ BEGIN
    ENDIF + FOR ( DATETIME date IN "WaterYearDatesByGroup"( watYearIndex ) ) STAT_SUM
       "FlowToVolume"( $ "Powell.Inflow" [date], date )
    ENDFOR ) COMMENTED_BY "This is added to check that in years when Powell might go very low, the model won't bomb out <br>when setting the preliminary release when Powell is low. TP 1/22/2013<br>") DO
-            IF_STATEMENT (NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "OffsetDate"( "RelativeEOWYDate"( @"Start Timestep" ), watYearIndex - 1.00000000, "1 years" ) ) )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "OffsetDate"( "RelativeEOWYDate"( @"Start Timestep" ), watYearIndex - 1.00000000, "1 years" ) )] := "Min"( "Max"( 8230.00000000 "1000 acre-feet", "CalcPrelimReleaseAmt_PreventModelCrash"( "WaterYearDatesByGroup"( watYearIndex ) ) ), availWatPowell );
+            IF_STATEMENT (NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "OffsetDate"( "RelativeEOWYDate"( @"Start Timestep" ), watYearIndex - 1.00000000, "1 years" ) ) )) THEN
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "OffsetDate"( "RelativeEOWYDate"( @"Start Timestep" ), watYearIndex - 1.00000000, "1 years" ) )] := "Min"( "Max"( 8230.00000000 "1000 acre-feet", "CalcPrelimReleaseAmt_PreventModelCrash"( "WaterYearDatesByGroup"( watYearIndex ) ) ), availWatPowell );
 
       END_IF_STATEMENT;
 
@@ -2082,8 +2082,8 @@ BEGIN
     RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) == 3.00000000 AND @"t" == @"Start Timestep" AND NOT "HasRuleFiredSuccessfully"( "Current Rule" );
     BEGIN
 
-      IF_STATEMENT (NOT "IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
-            $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "MaxItem"( { 8230.00000000 "1000 acre-feet" , "CalcPrelimReleaseAmt_PreventModelCrash"( "WaterYearDatesByGroup"( 1.00000000 ) ) , NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] ) } );
+      IF_STATEMENT (NOT "IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( @"t" ) ) )) THEN
+            $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] := "MaxItem"( { 8230.00000000 "1000 acre-feet" , "CalcPrelimReleaseAmt_PreventModelCrash"( "WaterYearDatesByGroup"( 1.00000000 ) ) , NaNToZero ( $ "PowellData.UserInput_MinAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( @"t" ) )] ) } );
 
       END_IF_STATEMENT;
 
@@ -2095,7 +2095,7 @@ BEGIN
     RULE_EXEC_CONSTRAINT "GetRunCycleIndex"(  ) >= 3.00000000 AND ( @"t" == @"Start Timestep" OR "MonthIs"( { "August" } ) ) AND @"t + 2" <= @"Finish Timestep";
     BEGIN
 
-      IF_STATEMENT (@"t" == @"Start Timestep" AND NOT IsNaN $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( 1.00000000 ) ) )]) THEN
+      IF_STATEMENT (@"t" == @"Start Timestep" AND NOT IsNaN $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( 1.00000000 ) ) )]) THEN
             FOREACH (LIST dateRelease IN "GetPowellReleasesCorrectedForBypass"( "Sort"( "GetPowellMonthlyReleases"( "WaterYearDatesByGroup"( 1.00000000 ) ) ) )) DO
             $ "Powell.Outflow" [GET @INDEX 0.00000000 FROM dateRelease] := GET @INDEX 1.00000000 FROM dateRelease;
 
@@ -2109,7 +2109,7 @@ BEGIN
    ELSE
       2.00000000
    ENDIF) DO
-            IF_STATEMENT (NOT IsNaN $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( waterYearNumber ) ) )] AND NOT IsNaN $ "Powell.Outflow" ["RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( IF ( "GetMonth"( @"Start Timestep" ) > 9.00000000 AND @"t" == @"Start Timestep" )
+            IF_STATEMENT (NOT IsNaN $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( waterYearNumber ) ) )] AND NOT IsNaN $ "Powell.Outflow" ["RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( IF ( "GetMonth"( @"Start Timestep" ) > 9.00000000 AND @"t" == @"Start Timestep" )
    THEN
       waterYearNumber
    ELSE
@@ -2122,7 +2122,7 @@ BEGIN
 
       END_IF_STATEMENT;
 
-            IF_STATEMENT ("IsInput"( $ "PowellData.AnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( waterYearNumber ) ) ) )) THEN
+            IF_STATEMENT ("IsInput"( $ "PowellData.TargetAnnualReleaseVolume", "Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( waterYearNumber ) ) ) )) THEN
             FOREACH (LIST dateRelease IN "Sort"( "GetPowellMonthlyReleases"( "WaterYearDatesByGroup"( waterYearNumber ) ) )) DO
             $ "Powell.Outflow" [GET @INDEX 0.00000000 FROM dateRelease] := GET @INDEX 1.00000000 FROM dateRelease;
 
@@ -2132,7 +2132,7 @@ BEGIN
 
       END_WITH_STATEMENT;
 
-    INACTIVE      IF_STATEMENT (@"t" == @"Start Timestep" AND NOT IsNaN $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( 1.00000000 ) ) )]) THEN
+    INACTIVE      IF_STATEMENT (@"t" == @"Start Timestep" AND NOT IsNaN $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( 1.00000000 ) ) )]) THEN
             FOREACH (LIST dateRelease IN "GetPowellReleasesCorrectedForBypass"( "Sort"( "GetPowellMonthlyReleases"( "WaterYearDatesByGroup"( 1.00000000 ) ) ) )) DO
             $ "Powell.Outflow" [GET @INDEX 0.00000000 FROM dateRelease] := GET @INDEX 1.00000000 FROM dateRelease;
 
@@ -2146,7 +2146,7 @@ BEGIN
    ELSE
       2.00000000
    ENDIF) DO
-            IF_STATEMENT (NOT @"t" == @"Start Timestep" AND NOT IsNaN $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( waterYearNumber ) ) )]) THEN
+            IF_STATEMENT (NOT @"t" == @"Start Timestep" AND NOT IsNaN $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( GET @INDEX 0.00000000 FROM "WaterYearDatesByGroup"( waterYearNumber ) ) )]) THEN
             FOREACH (LIST dateRelease IN "GetPowellReleasesCorrectedForBypass"( "Sort"( "GetPowellMonthlyReleases"( "WaterYearDatesByGroup"( waterYearNumber ) ) ) )) DO
             $ "Powell.Outflow" [GET @INDEX 0.00000000 FROM dateRelease] := GET @INDEX 1.00000000 FROM dateRelease;
 
@@ -5121,7 +5121,7 @@ BEGIN
     POST_EXEC_DIAG TRUE;
     BEGIN
 
-      $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( date ) )];
+      $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( date ) )];
 
     END;
 
@@ -5134,7 +5134,7 @@ BEGIN
     POST_EXEC_DIAG TRUE;
     BEGIN
 
-      $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] + ( $ "Powell.Storage" [EOWYDate] - $ "Mead.Storage" [EOWYDate] ) / 2.00000000;
+      $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] + ( $ "Powell.Storage" [EOWYDate] - $ "Mead.Storage" [EOWYDate] ) / 2.00000000;
 
     END;
 
@@ -5147,7 +5147,7 @@ BEGIN
     POST_EXEC_DIAG TRUE;
     BEGIN
 
-      $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] + ( $ "Powell.Storage" [EOWYDate] - $ "Mead.Storage" [EOWYDate] ) / 2.00000000;
+      $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] + ( $ "Powell.Storage" [EOWYDate] - $ "Mead.Storage" [EOWYDate] ) / 2.00000000;
 
     END;
 
@@ -5162,12 +5162,12 @@ BEGIN
 
       WITH NUMERIC PowellVolumeOverEqLevel = "Max"( $ "Powell.Storage" [EOWYDate] - "ElevationToStorage"( % "Powell", "EqLevel"( EOWYDate ) ), 0.00000000 "acre-ft" ) DO
       WITH NUMERIC equalizationReleaseVolume = "EqualizationRelease"( EOWYDate ) DO
-         WITH NUMERIC preliminaryReleaseVolume = "Min"( PowellVolumeOverEqLevel + $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )], equalizationReleaseVolume ) DO
-            WITH NUMERIC meadElevationWithPrelimRelease = IF ( $ "Mead.Storage" [EOWYDate] + ( preliminaryReleaseVolume - $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] ) >= "ElevationToStorage"( % "Mead", 1229.00000000 "feet" ) )
+         WITH NUMERIC preliminaryReleaseVolume = "Min"( PowellVolumeOverEqLevel + $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )], equalizationReleaseVolume ) DO
+            WITH NUMERIC meadElevationWithPrelimRelease = IF ( $ "Mead.Storage" [EOWYDate] + ( preliminaryReleaseVolume - $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] ) >= "ElevationToStorage"( % "Mead", 1229.00000000 "feet" ) )
             THEN
                1229.00000000 "feet"
             ELSE
-               "StorageToElevation"( % "Mead", $ "Mead.Storage" [EOWYDate] + ( preliminaryReleaseVolume - $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] ) )
+               "StorageToElevation"( % "Mead", $ "Mead.Storage" [EOWYDate] + ( preliminaryReleaseVolume - $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] ) )
             ENDIF DO
                IF ( meadElevationWithPrelimRelease < 1105.00000000 "ft" )
                THEN
@@ -5197,12 +5197,12 @@ BEGIN
 
       WITH NUMERIC PowellVolumeOverEqLevel = "Max"( $ "Powell.Storage" [EOWYDate] - "ElevationToStorage"( % "Powell", "EqLevel"( EOWYDate ) ), 0.00000000 "acre-ft" ) DO
       WITH NUMERIC equalizationReleaseVolume = "EqualizationRelease"( EOWYDate ) DO
-         WITH NUMERIC preliminaryReleaseVolume = "Min"( PowellVolumeOverEqLevel + $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )], equalizationReleaseVolume ) DO
-            WITH NUMERIC meadElevationWithPrelimRelease = IF ( $ "Mead.Storage" [EOWYDate] + ( preliminaryReleaseVolume - $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] ) >= "ElevationToStorage"( % "Mead", 1229.00000000 "feet" ) )
+         WITH NUMERIC preliminaryReleaseVolume = "Min"( PowellVolumeOverEqLevel + $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )], equalizationReleaseVolume ) DO
+            WITH NUMERIC meadElevationWithPrelimRelease = IF ( $ "Mead.Storage" [EOWYDate] + ( preliminaryReleaseVolume - $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] ) >= "ElevationToStorage"( % "Mead", 1229.00000000 "feet" ) )
             THEN
                1229.00000000 "feet"
             ELSE
-               "StorageToElevation"( % "Mead", $ "Mead.Storage" [EOWYDate] + ( preliminaryReleaseVolume - $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] ) )
+               "StorageToElevation"( % "Mead", $ "Mead.Storage" [EOWYDate] + ( preliminaryReleaseVolume - $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] ) )
             ENDIF DO
                IF ( meadElevationWithPrelimRelease < 1105.00000000 "ft" )
                THEN
@@ -5210,19 +5210,19 @@ BEGIN
                      WITH NUMERIC PowellVolumeOverEqLevelLess20ft = "Max"( $ "Powell.Storage" [EOWYDate] - "ElevationToStorage"( % "Powell", "EqLevel"( EOWYDate ) - 20.00000000 "ft" ), 0.00000000 "acre-ft" ) DO
                         IF ( equalizationReleaseVolume < totalVolumeToRaiseMeadTo1105 AND equalizationReleaseVolume < PowellVolumeOverEqLevelLess20ft )
                         THEN
-                           { equalizationReleaseVolume + $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] , 0.30000000 }
+                           { equalizationReleaseVolume + $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] , 0.30000000 }
                         ELSE
                            IF ( totalVolumeToRaiseMeadTo1105 < equalizationReleaseVolume AND totalVolumeToRaiseMeadTo1105 < PowellVolumeOverEqLevelLess20ft )
                            THEN
-                              { totalVolumeToRaiseMeadTo1105 + $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] , 0.40000000 }
+                              { totalVolumeToRaiseMeadTo1105 + $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] , 0.40000000 }
                            ELSE
-                              { PowellVolumeOverEqLevelLess20ft + $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] , 0.50000000 }
+                              { PowellVolumeOverEqLevelLess20ft + $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] , 0.50000000 }
                            ENDIF
                         ENDIF COMMENTED_BY "Choose the minimum of the equalization release, the release to take Mead to 1105 and the release to take Powell down to the equalization level less 20'"
                      ENDWITH COMMENTED_BY "Volume of Powell storage above the equalization level minus 20 feet"
                   ENDWITH COMMENTED_BY "Volume needed to release from Powell to raise Mead elevation to 1105'"
                ELSE
-                  IF ( preliminaryReleaseVolume == PowellVolumeOverEqLevel + $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] )
+                  IF ( preliminaryReleaseVolume == PowellVolumeOverEqLevel + $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( EOWYDate )] )
                   THEN
                      { preliminaryReleaseVolume , 0.10000000 }
                   ELSE
@@ -5291,7 +5291,7 @@ BEGIN
     POST_EXEC_DIAG FALSE;
     BEGIN
 
-      WITH NUMERIC powellAnnVol = $ "PowellData.AnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( IF ( @"t" == @"Start Timestep" )
+      WITH NUMERIC powellAnnVol = $ "PowellData.TargetAnnualReleaseVolume" ["Dec31ofYear"( "RelativeEOWYDate"( IF ( @"t" == @"Start Timestep" )
    THEN
       @"t"
    ELSE
@@ -5827,7 +5827,7 @@ BEGIN
     POST_EXEC_DIAG FALSE;
     BEGIN
 
-      APPEND "FlowToVolume"( "GetSeptemberSteadyFlowRelease"( $ "PowellData.AnnualReleaseVolume" [] ), @"24:00:00 September Max DayOfMonth, Current Year" ) ONTO INSERT "FlowToVolume"( "GetOctoberSteadyFlowRelease"(  ), @"24:00:00 October Max DayOfMonth, Current Year" ) INTO FOR ( NUMERIC i IN "GetNumbers"( 2.00000000, 11.00000000, 1.00000000 ) ) WITH LIST result = {  } DO
+      APPEND "FlowToVolume"( "GetSeptemberSteadyFlowRelease"( $ "PowellData.TargetAnnualReleaseVolume" [] ), @"24:00:00 September Max DayOfMonth, Current Year" ) ONTO INSERT "FlowToVolume"( "GetOctoberSteadyFlowRelease"(  ), @"24:00:00 October Max DayOfMonth, Current Year" ) INTO FOR ( NUMERIC i IN "GetNumbers"( 2.00000000, 11.00000000, 1.00000000 ) ) WITH LIST result = {  } DO
       APPEND "Interpolate"( "CurrentAnnualVolume"( @"t" ), $ "PowellData.PowellMonthlyReleaseTable" [0.00000000, "FindReleaseUpperBoundColumn"( "CurrentAnnualVolume"( @"t" ) )], $ "PowellData.PowellMonthlyReleaseTable" [0.00000000, "FindReleaseUpperBoundColumn"( "CurrentAnnualVolume"( @"t" ) ) + 1.00000000], $ "PowellData.PowellMonthlyReleaseTable" [i, "FindReleaseUpperBoundColumn"( "CurrentAnnualVolume"( @"t" ) )], $ "PowellData.PowellMonthlyReleaseTable" [i, "FindReleaseUpperBoundColumn"( "CurrentAnnualVolume"( @"t" ) ) + 1.00000000] ) ONTO result
    ENDFOR;
 
@@ -5858,11 +5858,11 @@ BEGIN
     BEGIN
 
       WITH LIST monthlyRelease = "Reverse"( "GetInitialPowellMonthlyVolumes"(  ) ) DO
-      IF ( "Sum"( monthlyRelease ) - $ "PowellData.AnnualReleaseVolume" [] >= 0.00000000 "acre-ft" )
+      IF ( "Sum"( monthlyRelease ) - $ "PowellData.TargetAnnualReleaseVolume" [] >= 0.00000000 "acre-ft" )
       THEN
-         "Min"( "GetElement"( monthlyRelease, 2.00000000 ) - 800.00000000 "1000 acre-ft", "Sum"( monthlyRelease ) - $ "PowellData.AnnualReleaseVolume" [] ) COMMENTED_BY "Return either the amount of reduction in july down to 800 kaf <br>or the total reduction (if it all occurs in July)"
+         "Min"( "GetElement"( monthlyRelease, 2.00000000 ) - 800.00000000 "1000 acre-ft", "Sum"( monthlyRelease ) - $ "PowellData.TargetAnnualReleaseVolume" [] ) COMMENTED_BY "Return either the amount of reduction in july down to 800 kaf <br>or the total reduction (if it all occurs in July)"
       ELSE
-         "Sum"( monthlyRelease ) - $ "PowellData.AnnualReleaseVolume" []
+         "Sum"( monthlyRelease ) - $ "PowellData.TargetAnnualReleaseVolume" []
       ENDIF COMMENTED_BY "If the monthly releases exceed the annual release volume, then decrease july first"
    ENDWITH;
 
@@ -5878,7 +5878,7 @@ BEGIN
     BEGIN
 
       WITH LIST monthlyRelease = "Reverse"( "GetInitialPowellMonthlyVolumes"(  ) ) DO
-      "Min"( "Max"( "GetElement"( monthlyRelease, 1.00000000 ) COMMENTED_BY "1 in reverse order is august" - 800.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.AnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in August down to 800 kaf <br>or the total reduction (if it all occurs in August)"
+      "Min"( "Max"( "GetElement"( monthlyRelease, 1.00000000 ) COMMENTED_BY "1 in reverse order is august" - 800.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.TargetAnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in August down to 800 kaf <br>or the total reduction (if it all occurs in August)"
    ENDWITH;
 
     END;
@@ -5893,7 +5893,7 @@ BEGIN
     BEGIN
 
       WITH LIST monthlyRelease = "Reverse"( "GetInitialPowellMonthlyVolumes"(  ) ) DO
-      "Min"( "Max"( "GetElement"( monthlyRelease, 3.00000000 ) - 800.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.AnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ) - "SteadyFlowReduce_2_August"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in June down to 800 kaf <br>or the total reduction (if it all occurs in June), In both cases negatives <br>can occur, so zero these out "
+      "Min"( "Max"( "GetElement"( monthlyRelease, 3.00000000 ) - 800.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.TargetAnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ) - "SteadyFlowReduce_2_August"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in June down to 800 kaf <br>or the total reduction (if it all occurs in June), In both cases negatives <br>can occur, so zero these out "
    ENDWITH;
 
     END;
@@ -5908,7 +5908,7 @@ BEGIN
     BEGIN
 
       WITH LIST monthlyRelease = "Reverse"( "GetInitialPowellMonthlyVolumes"(  ) ) DO
-      "Min"( "Max"( "GetElement"( monthlyRelease, 3.00000000 ) COMMENTED_BY "3 in reverse order is june" - 600.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.AnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ) - "SteadyFlowReduce_2_August"(  ) - "SteadyFlowReduce_3_June1"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in June down to 600 kaf <br>or the total reduction (if it all occurs in June)"
+      "Min"( "Max"( "GetElement"( monthlyRelease, 3.00000000 ) COMMENTED_BY "3 in reverse order is june" - 600.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.TargetAnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ) - "SteadyFlowReduce_2_August"(  ) - "SteadyFlowReduce_3_June1"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in June down to 600 kaf <br>or the total reduction (if it all occurs in June)"
    ENDWITH;
 
     END;
@@ -5923,7 +5923,7 @@ BEGIN
     BEGIN
 
       WITH LIST monthlyRelease = "Reverse"( "GetInitialPowellMonthlyVolumes"(  ) ) DO
-      "Min"( "Max"( "GetElement"( monthlyRelease, 5.00000000 ) COMMENTED_BY "5 in reverse order is april" - 500.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.AnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ) - "SteadyFlowReduce_2_August"(  ) - "SteadyFlowReduce_3_June1"(  ) - "SteadyFlowReduce_4_June2"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in April down to 500 kaf<br>or the total reduction (if it all occurs in June)"
+      "Min"( "Max"( "GetElement"( monthlyRelease, 5.00000000 ) COMMENTED_BY "5 in reverse order is april" - 500.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.TargetAnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ) - "SteadyFlowReduce_2_August"(  ) - "SteadyFlowReduce_3_June1"(  ) - "SteadyFlowReduce_4_June2"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in April down to 500 kaf<br>or the total reduction (if it all occurs in June)"
    ENDWITH;
 
     END;
@@ -5938,7 +5938,7 @@ BEGIN
     BEGIN
 
       WITH LIST monthlyRelease = "Reverse"( "GetInitialPowellMonthlyVolumes"(  ) ) DO
-      "Min"( "Max"( "GetElement"( monthlyRelease, 4.00000000 ) COMMENTED_BY "4 in reverse order is may" - 500.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.AnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ) - "SteadyFlowReduce_2_August"(  ) - "SteadyFlowReduce_3_June1"(  ) - "SteadyFlowReduce_4_June2"(  ) - "SteadyFlowReduce_5_April"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in June down to 600 kaf <br>or the total reduction (if it all occurs in June)"
+      "Min"( "Max"( "GetElement"( monthlyRelease, 4.00000000 ) COMMENTED_BY "4 in reverse order is may" - 500.00000000 "1000 acre-ft", 0.00000000 "acre-ft" ), "Max"( "Sum"( monthlyRelease ) - $ "PowellData.TargetAnnualReleaseVolume" [] - "SteadyFlowReduce_1_July"(  ) - "SteadyFlowReduce_2_August"(  ) - "SteadyFlowReduce_3_June1"(  ) - "SteadyFlowReduce_4_June2"(  ) - "SteadyFlowReduce_5_April"(  ), 0.00000000 "acre-ft" ) ) COMMENTED_BY "Return either the amount of reduction in June down to 600 kaf <br>or the total reduction (if it all occurs in June)"
    ENDWITH;
 
     END;
